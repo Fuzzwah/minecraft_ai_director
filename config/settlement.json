@@ -1,0 +1,58 @@
+{
+  "settlement": {
+    "id": "keepers_crossing",
+    "display_name": "Keeper's Crossing",
+    "world_id": "CHANGE_ME_TO_A_UNIQUE_WORLD_ID",
+    "enabled": false,
+    "dimension": "minecraft:overworld",
+    "origin": {"x": 120, "y": 67, "z": -40},
+    "initialize_on_first_run": false,
+    "starter_structures": [
+      {"structure_id": "keeper_shrine", "plot_id": "civic_center"},
+      {"structure_id": "storehouse_tier_1", "plot_id": "commercial_1"}
+    ]
+  },
+  "plots": {
+    "civic_center": {
+      "position": {"x": 120, "y": 67, "z": -40},
+      "size": {"width": 3, "depth": 3, "height": 4},
+      "facing": "north", "categories": ["civic"]
+    },
+    "commercial_1": {
+      "position": {"x": 130, "y": 67, "z": -40},
+      "size": {"width": 5, "depth": 5, "height": 4},
+      "facing": "north", "categories": ["commercial"]
+    },
+    "workshop_east": {
+      "position": {"x": 145, "y": 67, "z": -38},
+      "size": {"width": 7, "depth": 7, "height": 5},
+      "facing": "west", "categories": ["workshop", "commercial"]
+    },
+    "residential_1": {
+      "position": {"x": 110, "y": 67, "z": -25},
+      "size": {"width": 9, "depth": 7, "height": 6},
+      "facing": "east", "categories": ["residential"]
+    },
+    "residential_2": {
+      "position": {"x": 125, "y": 67, "z": -25},
+      "size": {"width": 9, "depth": 7, "height": 6},
+      "facing": "east", "categories": ["residential"]
+    }
+  },
+  "protected_regions": [],
+  "levels": {
+    "1": {"name": "Camp", "xp_required": 0, "unlocks": ["keeper_shrine", "storehouse_tier_1"]},
+    "2": {"name": "Hamlet", "xp_required": 100, "unlocks": ["workshop_tier_1", "cottage_tier_1"]},
+    "3": {"name": "Village", "xp_required": 300, "unlocks": ["house_tier_2"]},
+    "4": {"name": "Town", "xp_required": 700, "unlocks": []}
+  },
+  "quest_rewards": {
+    "1": [{"type": "settlement_xp", "amount": 10}],
+    "2": [{"type": "settlement_xp", "amount": 25}],
+    "3": [
+      {"type": "settlement_xp", "amount": 30},
+      {"type": "structure", "structure_id": "workshop_tier_1"},
+      {"type": "structure", "structure_id": "cottage_tier_1"}
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+/director_state.json
+/director_state.json.tmp
+/director_settlement.sqlite3
+/director_settlement.sqlite3-journal
+/director_settlement.sqlite3-wal
+/director_settlement.sqlite3-shm
+/logs/
