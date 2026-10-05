@@ -7,3 +7,4 @@ __pycache__/
 /director_settlement.sqlite3-wal
 /director_settlement.sqlite3-shm
 /logs/
+/director.env
