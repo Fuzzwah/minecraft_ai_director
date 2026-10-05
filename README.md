@@ -27,6 +27,11 @@ For an OpenAI-compatible endpoint, set `LLM_URL`, `LLM_MODEL`, and optionally
 `DIRECTOR_STATE` (default `director_state.json`). Older saves are loaded with
 stable quest IDs and empty settlement rewards.
 
+A local `director.env` is Git-ignored but is not loaded automatically. Keep it
+owner-only (`chmod 600 director.env`) and load it with
+`set -a; source ./director.env; set +a` in Bash before starting the Director.
+Never commit API keys or RCON credentials.
+
 Settlement integration is **off by default**. Existing quests, item rewards,
 player detection, log monitoring, and LLM quest generation do not require it.
 
