@@ -1,0 +1,52 @@
+{
+  "structures": {
+    "keeper_shrine": {
+      "display_name": "Keeper Shrine", "category": "civic",
+      "template": "director:keeper_shrine",
+      "footprint": {"width": 3, "depth": 3, "height": 4},
+      "allowed_plots": ["civic"], "progression": {"tier": 1},
+      "template_blocks": ["minecraft:air", "minecraft:cobblestone", "minecraft:oak_log", "minecraft:torch"],
+      "unlocks": []
+    },
+    "storehouse_tier_1": {
+      "display_name": "Storehouse", "category": "commercial",
+      "template": "director:storehouse_tier_1",
+      "footprint": {"width": 5, "depth": 5, "height": 4},
+      "allowed_plots": ["commercial"], "progression": {"tier": 1},
+      "template_blocks": ["minecraft:air", "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:oak_log", "minecraft:glass"],
+      "unlocks": []
+    },
+    "workshop_tier_1": {
+      "display_name": "Workshop", "category": "workshop",
+      "template": "director:workshop_tier_1",
+      "footprint": {"width": 7, "depth": 7, "height": 5},
+      "allowed_plots": ["workshop", "commercial"], "progression": {"tier": 1},
+      "template_blocks": ["minecraft:air", "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:oak_log", "minecraft:glass"],
+      "stages": [
+        {"template": "director:workshop_tier_1_foundation", "delay_seconds": 3},
+        {"template": "director:workshop_tier_1_frame", "delay_seconds": 3},
+        {"template": "director:workshop_tier_1", "delay_seconds": 0}
+      ],
+      "unlocks": ["tool_rewards"]
+    },
+    "cottage_tier_1": {
+      "display_name": "Cottage", "category": "residential",
+      "template": "director:cottage_tier_1",
+      "footprint": {"width": 5, "depth": 7, "height": 5},
+      "allowed_plots": ["residential"], "progression": {"tier": 1},
+      "repeatable": true,
+      "template_blocks": ["minecraft:air", "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:oak_log", "minecraft:glass"],
+      "unlocks": []
+    },
+    "house_tier_2": {
+      "display_name": "House", "category": "residential",
+      "template": "director:house_tier_2",
+      "footprint": {"width": 7, "depth": 9, "height": 6},
+      "allowed_plots": ["residential"],
+      "progression": {"tier": 2, "upgrades_from": ["cottage_tier_1"]},
+      "repeatable": true,
+      "template_blocks": ["minecraft:air", "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:oak_log", "minecraft:glass"],
+      "unlocks": []
+    }
+  }
+}
