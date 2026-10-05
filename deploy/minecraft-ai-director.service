@@ -1,0 +1,19 @@
+[Unit]
+Description=Vanilla Minecraft 26.3 AI director
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/minecraft_ai_director
+EnvironmentFile=%h/.config/minecraft-ai-director/director.env
+ExecStart=/usr/bin/python3 %h/minecraft_ai_director/director.py --config %h/.config/minecraft-ai-director/director.json run
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+KillSignal=SIGINT
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

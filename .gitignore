@@ -1,0 +1,15 @@
+.runtime/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+director_state.json
+*.sock
+*.lock
+.venv/
+node_modules/
+logs/

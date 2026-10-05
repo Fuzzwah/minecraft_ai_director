@@ -1,0 +1,14 @@
+{
+  "pack": {
+    "description": "The Keeper \u2014 vanilla Java 26.3 AI director bridge",
+    "pack_format": 121,
+    "min_format": [
+      121,
+      0
+    ],
+    "max_format": [
+      121,
+      0
+    ]
+  }
+}
