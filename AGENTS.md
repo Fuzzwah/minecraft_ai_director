@@ -255,8 +255,13 @@ and Director volumes as a matching rollback snapshot. The replacement world
 needs fresh Director state and a new settlement world identity if settlements
 are enabled; do not attach old quest/building records to regenerated terrain.
 Install the generation datapack before the new world's first generation, then
-verify generated temples, recompute spawn coordinates, and verify the Director.
-The isolated test server and unrelated family worlds must not be regenerated.
+verify generated temples, derive the nearest supported village from the recorded
+original spawn, set world spawn only at an inspected safe surface above solid
+terrain, and verify the persisted result. A failed locate, unloaded/uncertain
+column, or unsafe surface stops acceptance; do not guess coordinates, clear
+terrain, or use a fallback village. The Director's quest/turn-in spawn
+configuration is separate from Minecraft world spawn and is not changed by this
+step. The isolated test server and unrelated family worlds must not be regenerated.
 
 ## Isolated test server on this host
 
