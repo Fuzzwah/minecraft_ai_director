@@ -383,3 +383,106 @@ sets `[engine]` with `cgroup_manager = "cgroupfs"`. This explicitly selects the
 existing fallback backend when no systemd user session is available, preventing
 the repeated systemd/linger/fallback warnings without suppressing other warnings.
 It applies to all Podman commands run as `fuz`; no container restart is needed.
+
+## Village-temple generation — Java 26.3
+
+`datapack/director_village_temples/` puts one Keeper temple in the mandatory
+town center of each newly generated plains, desert, savanna, snowy, or taiga
+village, including abandoned villages. It replaces all 32 selectable roots,
+not optional house entries. The five root pools retain vanilla ordering,
+weights, processors, and rigid projection; normal single-pool elements honor
+the temple's explicit interior air. Village sites, frequency, and biome
+eligibility remain vanilla.
+
+Each temple has a biome-appropriate 5×5 shell and roof, an open entrance, and a
+chiseled-stone-brick altar capped with a smooth-stone slab. Original road joints
+are retained; the per-root manifest records ancillary connector relocations.
+Abandoned processors may weather walls without removing the roof, altar,
+supported floor, or entry clearance.
+
+### Install and use
+
+This separate pack targets **Java 26.3 only**: exact data-pack version **121.0**,
+DataVersion **5023**, protocol **777**. Copy its whole directory into the chosen
+world's `datapacks/` before that world's first generation; pre-create the level
+directory if necessary. On startup, inspect logs and `datapack list enabled`:
+`file/director_village_temples` must be enabled without registry/template errors.
+Installation into an existing world affects only new village starts; it does
+not retrofit explored villages or overwrite player edits.
+
+Packs overriding `minecraft:village/<style>/town_centers` or the corresponding
+root templates conflict with the mandatory-temple guarantee. Verify the
+effective pack stack rather than assuming arbitrary worldgen interoperability.
+Disposable test dimensions/pools are not part of this deployable pack.
+
+Generation needs no Director, settlement initialization, online player, model
+request, mod, or Python process. Generated temples are ordinary editable world
+blocks, not Director-owned buildings, protected zones, new quest turn-in sites,
+or settlement rewards. This does not guarantee a temple at spawn, flatten
+terrain, or increase village frequency. `director_buildings` and its registry
+remain unchanged at Java **1.21–1.21.1**, format **48**.
+
+### Reproduce and inspect assets
+
+Standard-library development tooling; the server archive is not committed or
+needed at runtime. Set `SERVER_ARCHIVE` to the actual 26.3 archive containing
+`data/` and `version.json` (the extracted `versions/26.3/server-26.3.jar`, not
+the outer server bootstrap JAR):
+
+```bash
+python3 -B tools/village_temples.py --archive "$SERVER_ARCHIVE"
+python3 -B tools/village_temples.py --check
+python3 -B -m unittest discover -v
+```
+
+The archive SHA-256 is pinned to
+`a362163eec5d1612d520772bc16e5b39c09e3b234fdc045f56bf544284ee8ae6`.
+`tools/village_temple_recipes.json` supplies all 32 explicit room placements.
+The generated `manifest.json` records archive/image/version provenance, source
+pools/processors, geometry, and connector changes. `--output PATH` writes or
+checks an alternate pack directory. The type-preserving NBT codec handles Java
+tag types and modified UTF-8; gzip output is deterministic.
+
+Semantic checks decode real assets and cover effective normal/abandoned
+selection boundaries, exactly one altar, roof/walls, explicit room clearance,
+supported floors, road accessibility, processor outcomes, and all rotations.
+They reject missing rare roots, obstructed entrances, broken floors/roofs,
+duplicate altars, and altered trusted joints. Asset checks do not replace actual
+server generation or client rendering/traversal checks.
+
+### Isolated Java 26.3 evidence and limits
+
+The disposable Java 26.3 fixture server loaded
+`file/director_village_temples` before generation and accepted the pack without
+registry, template, or startup errors. Controlled fixture placement issued the
+server's `Loaded template` response for the authored root resources, including
+normal and abandoned roots and all four rotation values. The actual generated
+block data was inspected separately from the committed NBT; it showed the
+chiseled-stone-brick altar base, roof blocks, and open entry in rotated
+placements. Vanilla jigsaw assembly was exercised from each of the five town
+center pools, including uneven natural terrain. The fixture-only root pools and
+temporary dimensions stayed outside `datapack/director_village_temples`.
+
+For the fixed seed `-6123800180571355156`, Java 26.3 reported identical
+`locate structure` results with the pack enabled and with a packless server:
+plains `[-944, -224]`, desert `[-1872, -2080]`, savanna `[-1936, -1632]`,
+snowy `[-3504, -4784]`, and taiga `[2992, -3728]`. This checks runtime site
+selection, not copied JSON. Natural packed-world region inspection found altar
+blocks at the corresponding village sites, including plains `[-957, 68, -214]`,
+desert `[-1867, 64, -2074]`, savanna near `[-1949, 67, -1625]`, snowy
+`[-3509, 99, -4788]`, and taiga near `[2994, 66, -3734]`.
+
+Installing the pack after a scratch plains village already existed preserved a
+player-edited gold block at `[96, 101, 96]`; a later packed desert town center
+was generated at `[300, 100, 100]`. A packed scratch temple placed at `[500,
+100, 100]` was edited at its altar, saved, unloaded, and restarted. After the
+restart the gold edit remained, the altar base remained present, and region
+inspection found exactly one altar-base block in that template volume. No
+Director process was involved in these generation or persistence checks.
+
+No ordinary Java 26.3 client or launcher was available in the verification
+environment. RCON and region inspection prove server-side blocks and
+persistence only; screenshots, client rendering, and player traversal remain
+unverified. Generated temples are ordinary editable world blocks, not
+protected zones. The disposable containers and fixture assets are not part of
+the deployable pack.
