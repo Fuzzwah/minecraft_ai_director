@@ -1,5 +1,34 @@
 # Agent guide
 
+## Spec-driven changes
+
+Use OpenSpec for substantive feature and behavior changes. Project context and
+artifact rules live in `openspec/config.yaml`; capabilities live in
+`openspec/specs/`, and proposed work lives in `openspec/changes/`.
+Explore and propose before implementation so the user can review requirements,
+design, and tasks. Do not treat a proposal as permission to mutate a live world.
+Oh My Pi commands are in `.omp/commands/`; shared skills are in
+`.agents/skills/openspec-*`. See README's OpenSpec section for setup and usage.
+Preserve the existing `shipit` skill and the safety invariants below.
+
+### Branch and worktree workflow
+
+- Do planning and specification work in the primary checkout on `main`, including
+  OpenSpec proposals, requirements, designs, and implementation task plans.
+- Commit and push planning/spec changes directly to `origin/main`; do not create
+  a feature branch or pull request solely for planning. Stage only intended
+  planning/tooling/documentation files, never credentials or unrelated local data.
+- Push the reviewed plan before starting implementation. Create a separate Git
+  worktree on a feature branch based on the updated `origin/main`, or synchronize
+  an existing implementation worktree with that planning commit.
+- Run `/opsx-apply` only in the implementation worktree, never in the primary
+  `main` checkout. Keep implementation code, tests, and task-progress updates on
+  that worktree's feature branch.
+- Make subsequent planning/spec revisions on `main`, commit and push them, then
+  bring those revisions into the implementation branch before continuing apply.
+- Integrate completed implementation through the existing shipping workflow;
+  direct pushes to `main` are for planning/spec work, not implementation.
+
 ## Project and code map
 
 This project is a standard-library Python Minecraft Java Director. Python 3.10+

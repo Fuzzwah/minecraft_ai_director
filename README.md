@@ -238,6 +238,50 @@ the building.
   with larger structures, entities, or block entities without validating and
   updating the registry. RCON cannot attest the server's actual template files.
 
+## Spec-driven development with OpenSpec
+
+[Fission-AI OpenSpec](https://github.com/Fission-AI/OpenSpec) is development-only
+tooling; it adds no Python runtime dependencies. Requires Node.js 20.19+.
+The project was initialized with OpenSpec **1.14.1**, the core workflow,
+Oh My Pi commands, and vendor-neutral shared agent skills:
+
+```bash
+npm install -g @fission-ai/openspec@1.14.1
+openspec init --tools oh-my-pi,agents --profile core --no-animation
+```
+
+Project context and safety rules are in `openspec/config.yaml`. Accepted
+capabilities belong in `openspec/specs/`; proposals and implementation artifacts
+belong in `openspec/changes/`. No feature proposal is created by setup.
+
+In Oh My Pi, use `/opsx-explore` to investigate an idea, then
+`/opsx-propose <idea-or-change-name>` to draft requirements, design, and tasks.
+Review the plan before `/opsx-apply`; use `/opsx-update` to revise it,
+`/opsx-sync` to synchronize delta specs, and `/opsx-archive` after completion.
+Other assistants can use the matching `.agents/skills/openspec-*` skills.
+Restart the assistant session if newly generated commands are not discovered.
+
+Useful terminal commands:
+
+```bash
+openspec list
+openspec list --specs
+openspec validate --all --strict --no-interactive
+openspec doctor
+openspec update
+```
+
+`openspec update` refreshes generated skills and commands. Keep project-specific
+guidance in `openspec/config.yaml` and `AGENTS.md`, not in generated files.
+OpenSpec planning does not deploy datapacks, create temples, enforce player
+protection, or start servers. Those actions need explicit implementation and
+deployment steps targeting the correct world and Minecraft version.
+
+Setup was smoke-checked with `openspec doctor` and an isolated temporary change:
+project context/rules reached artifact instructions, strict validation passed,
+and the planning workflow reached the implementation-ready state. The temporary
+change was removed; no feature implementation or live-world verification occurred.
+
 ## Verification
 
 ```bash
