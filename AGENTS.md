@@ -19,7 +19,7 @@ full configuration and admin contract before changing behavior.
 - `config/settlement.json`: world identity, geometry, protected regions,
   progression, and starter settings. Repository coordinates are examples.
 - `datapack/director_buildings`: real compressed NBT assets; targets Java
-  1.21–1.21.1, datapack format 48.
+  26.3, datapack format 121.0.
 - `tests/test_director.py`, `tests/test_settlement.py`, `tests/support.py`:
   isolated unittest coverage, fake RCON, and decoding of the real bundled NBT.
 
@@ -47,7 +47,7 @@ by default; enabling them requires both `DIRECTOR_SETTLEMENT_ENABLED=1` and
 - Installed templates are trusted admin assets. Keep NBT geometry/palette and
   registry definitions consistent; do not introduce entities/block entities or
   bypass exact-state inspection for unsupported blocks.
-- On Java 1.21.1 the affirmative placement response is exactly
+- On Java 1.21.1 and 26.3 the affirmative placement response is exactly
   `Loaded template "<resource>" at <x>, <y>, <z>`. Match the requested template
   and translated anchor. Do not accept guessed `Placed template` wording,
   generic success substrings, empty responses, or localized responses.
@@ -87,11 +87,14 @@ For RCON/world changes, also smoke the actual Java test server below. Start with
 an admin dry-run and inspect plot availability before any live construction.
 Do not use a startup or construction retry as a recovery mechanism.
 
-Previously verified on the live Java 1.21.1 server: dry-run immutability, staged
-workshop construction, chest rejection, owned cottage-to-house upgrade, safe
-removal, and world/SQLite persistence through restart. Those checks do **not**
-prove visual client rendering or authenticated player quest completion; those
-require a Minecraft client. Update `README.md` when the operating contract changes.
+Previously verified on Java 1.21.1: dry-run immutability, staged workshop
+construction, chest rejection, owned cottage-to-house upgrade, safe removal,
+and world/SQLite persistence through restart. On the fresh Java 26.3 world:
+starter initialization, exact shrine/storehouse blocks, idempotent initialization,
+guarded removal preview with unchanged SQLite, and loaded chunks beyond the native
+idle-pause threshold. These checks do **not** prove visual client rendering or
+authenticated player quest completion; those require a Minecraft client.
+Update `README.md` when the operating contract changes.
 
 ## Isolated test server on this host
 
@@ -111,7 +114,7 @@ CLI setting; `podman info --format '{{.Host.CgroupManager}}'` should show `cgrou
 | Test root | `/home/fuz/mc-director-village-test` |
 | Minecraft container | `mc_director_village_test` |
 | Director container | `mc_director_village_test_director` |
-| Client connection | **`10.1.1.232:25567`, Minecraft Java 1.21.1** |
+| Client connection | **`10.1.1.232:25568`, Minecraft Java 26.3** |
 | RCON | **`127.0.0.1:25577`**, never public |
 | World | `$TEST_ROOT/data/world` |
 | Installed datapack | `$TEST_ROOT/data/world/datapacks/director_buildings` |
@@ -127,13 +130,29 @@ path; it may not exist until the first save.
 The server uses creative/peaceful superflat terrain, online authentication, a
 whitelist (`CheekyHambone`), four player slots, and a 2 GB heap. Settlement plots
 are near **120, -60, -40**, above grass at y=-61; chunks are force-loaded.
-At initial handoff the settlement had 300 XP (level 3, Village), shrine,
-storehouse, workshop, and an owned tier-2 house; `residential_2` was free.
+The fresh 26.3 world started with 0 XP (level 1, Camp), shrine and storehouse,
+and three free plots. No quests or progression were imported from the old world.
 **Inspect current state rather than assuming this remains true.**
 
 The Director runs `DEMO_MODE=1`: no external LLM calls, quest interval 120 seconds.
 AI-selected structure rewards require explicit LLM configuration and demo mode
 disabled; do not enable billable calls implicitly.
+
+The retained 1.21.1 world and paired configuration/Director state are under
+`$TEST_ROOT/backups/20261006-before-26.3-fresh-world-94fb5220`. The current world ID
+is `director-test-26.3-797c7e0c-d369-4ac8-ad1a-9bf05beea172`; keep it with this
+world only. Rollback must restore the old world, identity, state, and server
+version together. Never reuse old progression in the fresh world.
+
+Keep `VERSION=26.3`, `ENABLE_AUTOPAUSE=false`, and
+`PAUSE_WHEN_EMPTY_SECONDS=-1` in the private Minecraft environment. The latter
+disables Java's native 60-second idle pause; the former autopause flag does not.
+An idle-paused server accepted RCON but failed loaded-plot guards even with
+force-load tickets. The mapped rootless volume ownership requires `podman unshare`
+for moves while stopped; do not recursively chown the volume.
+
+Port 25567 belongs to the unrelated `mc_hardcore` server. The user approved
+25568 for this isolated server; do not stop family containers to reclaim 25567.
 
 ### Start and operate existing containers with Podman
 
@@ -190,15 +209,17 @@ these accept `start`, `stop`, `restart`, `status`, and `logs`:
 "$TEST_ROOT/director.sh" admin show settlement
 "$TEST_ROOT/director.sh" admin list structures
 "$TEST_ROOT/director.sh" admin list plots
-DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin construct \
-  cottage_tier_1 residential_2 --owner CheekyHambone
+DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin remove structure civic_center
 ```
 
 The admin wrapper loads the private environment and invokes host Python with
-`-B`; it does not start another Director loop. The example dry-run requires that
-plot to still be free. Live construction uses the same CLI without dry-run;
-`--wait` advances stages in the admin process. Otherwise the running Director
-or admin `tick` advances durable jobs. Removal is admin-only.
+`-B`; it does not start another Director loop. The example is a guarded removal
+**preview only** requiring the shrine to remain unchanged and unoccupied. Keep
+`DIRECTOR_DRY_RUN=1`; do not remove a starter as a smoke check. Cottage construction
+is locked at starting XP. For deliberate live construction, select an unlocked
+structure and compatible free plot; `--wait` advances stages in the admin process.
+Otherwise the running Director or admin `tick` advances durable jobs.
+Removal is admin-only.
 
 ### Recreate a missing container, without replacing its state
 
@@ -215,7 +236,7 @@ export REPO=/home/fuz/orca/workspaces/minecraft_ai_director/village
 podman create --name mc_director_village_test \
   --network slirp4netns:port_handler=rootlesskit \
   --restart=unless-stopped --env-file "$TEST_ROOT/server.env" \
-  --publish 10.1.1.232:25567:25565/tcp \
+  --publish 10.1.1.232:25568:25565/tcp \
   --publish 127.0.0.1:25577:25575/tcp \
   --volume "$TEST_ROOT/data:/data:Z" --stop-timeout 60 \
   docker.io/itzg/minecraft-server@sha256:783d2712019a3996b4168752517a08d3448ef8995879b200316c3888f98dc394

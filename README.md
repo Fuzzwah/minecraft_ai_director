@@ -34,7 +34,7 @@ player detection, log monitoring, and LLM quest generation do not require it.
 
 1. Back up the Minecraft world and Director state.
 2. Install `datapack/director_buildings` into the world's `datapacks` directory.
-   Its real compressed NBT templates target **Java 1.21–1.21.1**, pack format 48.
+   Its real compressed NBT templates target **Java 26.3**, datapack format 121.0.
    Reload datapacks as an administrator. For another Minecraft version, verify
    datapack compatibility before enabling construction.
 3. Edit `config/settlement.json`. Assign a unique, stable `world_id` to this
@@ -248,7 +248,10 @@ durable quest reward recovery.
 Live Java 1.21.1 checks also exercised a server-connected dry-run with unchanged
 SQLite bytes, staged workshop construction, protected-chest rejection, an owned
 cottage-to-house upgrade, safe removal, and persisted buildings across restart.
-The server's affirmative template response is
+Live Java 26.3 checks verified fresh-world initialization, exact shrine/storehouse
+blocks, idempotent starter initialization, and a guarded removal dry-run with
+unchanged SQLite bytes. Loaded-plot guards also passed after more than 60 seconds
+without players. The server's affirmative template response remains
 `Loaded template "<resource>" at <x>, <y>, <z>`; acknowledgement must match the
 requested template and translated placement anchor exactly. Unrecognized or
 mismatched acknowledgements still protect the plot rather than replaying it.
@@ -260,7 +263,7 @@ Minecraft client; RCON inspection does not prove those surfaces.
 An isolated rootless Podman deployment is installed outside the repository at
 `/home/fuz/mc-director-village-test`. It does not use an existing family world.
 
-- **Connect with Minecraft Java 1.21.1 to `10.1.1.232:25567`.**
+- **Connect with Minecraft Java 26.3 to `10.1.1.232:25568`.**
 - Creative, peaceful, fresh superflat world; 4 player slots and a 2 GB Java heap.
 - Online account authentication and whitelist are enabled; `CheekyHambone` is
   whitelisted. Add other accounts explicitly with the console control below.
@@ -268,9 +271,9 @@ An isolated rootless Podman deployment is installed outside the repository at
   owner-only `server.env` and `director.env`, not in this repository.
 - The settlement is near `120, -60, -40`; plots use the air layer above the
   flat grass terrain. Registered chunks stay force-loaded.
-- The test state contains the shrine, storehouse, staged workshop, and a Tier 2
-  house. Workshop and house ownership is assigned to `CheekyHambone`;
-  `residential_2` remains available. Test XP is 300, settlement level 3.
+- The fresh 26.3 world starts with the shrine and storehouse, three available
+  plots, and **0 XP, level 1 (Camp)**. No old quests, buildings, or XP were imported.
+  Inspect current state before acting; player activity can change it.
 - The Director runs in **DEMO mode**: collect quests and configured settlement
   XP, with no external LLM calls. Quest interval is 120 seconds. Building controls
   remain available through the admin CLI; AI-selected building rewards require
@@ -285,8 +288,24 @@ TEST_ROOT=/home/fuz/mc-director-village-test
 "$TEST_ROOT/server.sh" console whitelist add YourMinecraftName
 "$TEST_ROOT/director.sh" admin show settlement
 "$TEST_ROOT/director.sh" admin list plots
-DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin construct cottage_tier_1 residential_2 --owner CheekyHambone
+DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin remove structure civic_center
 ```
+
+The removal example is a **preview only**; never omit `DIRECTOR_DRY_RUN=1`
+for this smoke check. It requires an unchanged, unoccupied shrine. A cottage
+construction preview is locked at the fresh world's starting XP.
+
+For human testing, join as a whitelisted account, read the Keeper's collect
+quest, and carry the requested items in your inventory within six blocks of
+`120, -60, -40`. Confirm consumption, completion chat/title, vanilla rewards,
+and settlement XP. DEMO mode does not select structure rewards.
+
+The previous 1.21.1 world and its paired Director/configuration state are retained
+at `/home/fuz/mc-director-village-test/backups/20261006-before-26.3-fresh-world-94fb5220`.
+The new world uses a distinct world ID and seed. Rollback must restore the old
+world, world identity, Director state, and matching server version together;
+never attach the old database to the fresh world. Port 25567 now belongs to the
+unrelated `mc_hardcore` server; leave it alone.
 
 Lifecycle controls are `start`, `stop`, and `restart` on each script. Stop the
 Director before stopping/restarting Minecraft; start Minecraft before the
@@ -297,6 +316,13 @@ host-boot autostart is not installed.
 The Minecraft container uses `slirp4netns` port forwarding: this avoids the
 host's observed `pasta` restart/rebind failure. The Director container uses an
 init process and SIGINT shutdown so state connections close cleanly.
+
+Keep `PAUSE_WHEN_EMPTY_SECONDS=-1` in the Minecraft environment. Java 26.3's
+native `pause-when-empty-seconds` otherwise defaults to 60; RCON connectivity and
+force-load tickets alone did not make paused chunks available to construction.
+`ENABLE_AUTOPAUSE=false` disables only the image's separate autopause mechanism.
+The rootless Minecraft volume has mapped ownership; move it with
+`podman unshare` while stopped rather than changing ownership recursively.
 
 The host's user Podman config, `/home/fuz/.config/containers/containers.conf`,
 sets `[engine]` with `cgroup_manager = "cgroupfs"`. This explicitly selects the

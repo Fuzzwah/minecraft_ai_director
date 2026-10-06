@@ -1,6 +1,8 @@
 {
   "pack": {
-    "pack_format": 48,
-    "description": "AI Director approved settlement templates (Minecraft Java 1.21–1.21.1)"
+    "pack_format": 121,
+    "min_format": [121, 0],
+    "max_format": [121, 0],
+    "description": "AI Director approved settlement templates (Minecraft Java 26.3)"
   }
 }
