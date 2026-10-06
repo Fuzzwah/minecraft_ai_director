@@ -8,6 +8,80 @@ Settlement construction extends the same trust boundary: the model requests
 approved building IDs; Python owns coordinates, templates, validation, scheduling,
 and world mutation. Model responses are never executed as commands.
 
+## Long-lived live server
+
+Connect to **`10.1.1.232:25555`** with Minecraft Java **26.3**. The persistent
+server is `mc_ai_director_default`, with companion `mc_ai_director_default_keeper`.
+The names are retained for continuity; this server no longer uses host port 25565.
+The Director loads source from the primary `main` checkout at
+`/home/fuz/code/minecraft_ai_director`, not an implementation worktree.
+
+```bash
+systemctl --user stop mc_ai_director_default_keeper.service
+systemctl --user restart mc_ai_director_default.service
+systemctl --user start mc_ai_director_default_keeper.service
+podman exec mc_ai_director_default rcon-cli list
+podman logs -f mc_ai_director_default_keeper
+```
+
+World/server data and Director state persist in `mc_ai_director_default_data`
+and `mc_ai_director_default_state`; RCON is not published on the host.
+The separate hardcore server uses port 25567.
+
+Matched rollback snapshots are stored under `/home/fuz/mc-ai-director-backups/`
+with a checksum manifest. Take a fresh snapshot immediately before the future
+regeneration if the existing world has been played since its last backup.
+
+**Village-temple deployment requires regenerating this live world**, but only
+after the generation feature is implemented and verified for Java 26.3.
+Preserve both existing volumes as a rollback snapshot before regeneration.
+Install the generation datapack before creating the replacement world; use fresh
+Director state, recompute spawn, and verify generated temples before playtesting.
+The existing construction templates alone do not add temples to vanilla villages.
+
+Regeneration is a destructive cutover. Stop the Director writer first, flush and
+snapshot the complete Minecraft and Director volumes as one matched pair, then
+create a new random-seed world with the verified Java 26.3 temple pack already
+installed. Provision a new quest JSON, settlement database, and settlement
+`world_id`; never reuse old records with new terrain. If any placement, spawn,
+container, Director, persistence, or uncertainty check fails, stop both writers
+and restore the matched snapshot instead of retrying or mixing state.
+
+### Set world spawn after regeneration
+
+The temple pack does not change Minecraft's world-spawn metadata. During a live
+world regeneration, record the original overworld spawn before replacement.
+After the new Java 26.3 world has generated terrain and the temple pack is
+enabled, locate every supported village type from that recorded position and
+choose the smallest horizontal distance:
+
+```bash
+export ORIGINAL_SPAWN_X=0 ORIGINAL_SPAWN_Y=72 ORIGINAL_SPAWN_Z=0
+for TYPE in plains desert savanna snowy taiga; do
+  podman exec mc_ai_director_default rcon-cli \
+    "execute positioned $ORIGINAL_SPAWN_X $ORIGINAL_SPAWN_Y $ORIGINAL_SPAWN_Z run locate structure minecraft:village_$TYPE"
+done
+```
+
+Do not accept a guessed coordinate or a failed/localized locate response. Load
+and inspect the selected village column, confirm a solid support block and clear
+air above it, then set the world spawn one block above that support. Do not
+clear terrain, force an unsafe spawn, or proceed when the target chunk/state is
+uncertain. Flush the world and verify the persisted spawn metadata before
+starting normal play:
+
+```bash
+podman exec mc_ai_director_default rcon-cli 'setworldspawn <x> <y> <z>'
+podman exec mc_ai_director_default rcon-cli 'save-all flush'
+```
+
+For the current regenerated live world, the nearest result is the taiga village
+at `[112, ~, 32]`. Its verified support is
+`[112, 71, 32] = minecraft:smooth_stone`, so the persisted world spawn is
+`[112, 72, 32]`. This changes only the default world spawn. Beds and respawn
+anchors remain authoritative for players who have set them. The Director's
+quest/turn-in coordinates (`SPAWN_X`, `SPAWN_Y`, `SPAWN_Z`) are a separate
+contract and are not changed by this world-spawn adjustment.
 ## Run the existing Director
 
 Requires Python 3.10+ and a Java server with RCON enabled. Keep RCON private.
@@ -29,6 +103,51 @@ stable quest IDs and empty settlement rewards.
 
 Settlement integration is **off by default**. Existing quests, item rewards,
 player detection, log monitoring, and LLM quest generation do not require it.
+
+## Adaptive temple offerings
+
+The Java 26.3 temple datapack adds two containers to every supported normal and
+abandoned town-center root: one empty normal chest for the communal Keeper
+offering and one ender chest for private player offerings. The Python Director
+never accepts chest coordinates, item IDs, quantities, lanes, scores, or rewards
+from the model. Configure the generated temple's communal chest explicitly:
+
+| Variable | Default |
+| --- | --- |
+| `MINECRAFT_WORLD` | `/minecraft/world` |
+| `OFFERING_CHEST_X/Y/Z` | unset; communal quests decline until configured |
+| `SPAWN_SUPPLY_RADIUS` | `64` blocks |
+
+A communal quest uses the configured loaded chest and rewards all eligible online
+players at completion. A private quest uses only its target player's ender chest
+and rewards only that target. Offerings are persisted as prepared, uncertain, or
+completed intents; a lost RCON response stops the Director for reconciliation and
+never replays consumption or rewards. Player-inventory and arbitrary-chest
+fallbacks are not supported.
+
+Candidate items are Python-owned. Spawn-local communal items require a complete
+saved Anvil observation of the bounded village area; private local items may also
+be observed in that target's inventories. Higher early, established, Nether/End,
+and endgame bands require bounded progression scores from experience, equipment,
+and owned materials. A missing or malformed signal lowers confidence and cannot
+unlock an advanced band. The LLM and deterministic fallback receive the same
+filtered candidates, and an empty candidate set produces no quest.
+
+The quest state contains one durable communal quest and one durable private quest
+per eligible player. Preserve this JSON with the matching world; do not attach it
+to regenerated terrain. The observation and RCON contract targets Java 26.3;
+the settlement construction pack remains a separate Java 1.21–1.21.1 artifact.
+
+Acceptance evidence: the disposable Java 26.3 server loaded the temple pack before
+first generation, generated a natural taiga village with an empty chest and ender
+chest, placed controlled roots in all four rotations, and retained them across a
+save/restart. RCON verified Java 26.3 protocol/data versions and exact container
+NBT. Standard-library Director probes read the real saved village supply and
+consumed a partial pumpkin stack while preserving its slot. Unit tests cover
+communal all-online and private target-only rewards, restart persistence, and
+lost-response uncertainty. A rendered client workflow was not verified: the
+cached official client reached Java 26.3 but its authentication token returned
+HTTP 401, so no client joined the offline acceptance server.
 
 ## Safely enable settlements
 

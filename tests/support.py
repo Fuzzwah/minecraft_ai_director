@@ -51,6 +51,11 @@ class FakeMinecraft:
     def __init__(self):
         self.blocks = {}
         self.players = []
+        self.player_levels = {}
+        self.player_inventory = {}
+        self.ender_items = {}
+        self.chest_items = []
+        self.chest_position = (10, 64, 10)
         self.commands = []
         self.placements = []
         self.fail_place = False
@@ -58,6 +63,13 @@ class FakeMinecraft:
         self.respond = True
         self.inventory = 20
         self.fail_announce = False
+
+    @staticmethod
+    def _items_text(items):
+        return "[" + ", ".join(
+            f'{{Slot: {slot}b, id: "{item}", count: {count}}}'
+            for slot, item, count in items
+        ) + "]"
 
     def command(self, command):
         self.commands.append(command)
@@ -83,7 +95,18 @@ class FakeMinecraft:
                 if not match:
                     return "Test failed"
         if command == "list" or command.endswith(" run list"):
-            return "There are 0 of a max of 20 players online: "
+            names = [player if isinstance(player, str) else "TestPlayer" for player in self.players]
+            return f"There are {len(self.players)} of a max of 20 players online: " + ", ".join(names)
+        if command == "save-all flush":
+            return "Saved the game"
+        entity = re.match(r"data get entity ([A-Za-z0-9_]+) (Inventory|EnderItems|ArmorItems|HandItems)", command)
+        if entity:
+            player, path = entity.groups()
+            items = self.ender_items.get(player, []) if path == "EnderItems" else self.player_inventory.get(player, [])
+            return "data: " + self._items_text(items)
+        levels = re.match(r"experience query ([A-Za-z0-9_]+) levels", command)
+        if levels:
+            return f"{levels.group(1)} has {self.player_levels.get(levels.group(1), 0)} experience levels"
         placement = re.search(r"(?:^| run )place template ([\w:]+) (-?\d+) (-?\d+) (-?\d+) (\w+) none", command)
         if placement:
             if self.fail_place:
@@ -111,6 +134,34 @@ class FakeMinecraft:
             pos = tuple(int(v) for v in removal.groups())
             self.blocks[pos] = "minecraft:air"
             return f"Changed the block at {pos[0]}, {pos[1]}, {pos[2]}"
+        block_read = re.search(r"data get block (-?\d+) (-?\d+) (-?\d+) (id|Items)", command)
+        if block_read:
+            x, y, z, path = block_read.groups()
+            pos = (int(x), int(y), int(z))
+            if path == "id":
+                block = self.blocks.get(pos, "minecraft:air").split("[", 1)[0]
+                return f"{pos[0]}, {pos[1]}, {pos[2]} has value \"{block}\""
+            return f"{pos[0]}, {pos[1]}, {pos[2]} has the following block data: {{Items: {self._items_text(self.chest_items)}}}"
+        remove = re.match(r"data remove block (-?\d+) (-?\d+) (-?\d+) Items\[\{Slot:(-?\d+)b\}\]", command)
+        if remove:
+            slot = int(remove.group(4))
+            self.chest_items[:] = [item for item in self.chest_items if item[0] != slot]
+            return "Modified block data"
+        modify = re.match(r"data modify block (-?\d+) (-?\d+) (-?\d+) Items\[\{Slot:(-?\d+)b\}\]\.count set value (\d+)", command)
+        if modify:
+            slot, count = int(modify.group(4)), int(modify.group(5))
+            self.chest_items[:] = [(s, item, count if s == slot else old) for s, item, old in self.chest_items]
+            return "Modified block data"
+        entity_remove = re.match(r"data remove entity ([A-Za-z0-9_]+) EnderItems\[\{Slot:(-?\d+)b\}\]", command)
+        if entity_remove:
+            player, slot = entity_remove.group(1), int(entity_remove.group(2))
+            self.ender_items[player] = [item for item in self.ender_items.get(player, []) if item[0] != slot]
+            return "Modified entity data"
+        entity_modify = re.match(r"data modify entity ([A-Za-z0-9_]+) EnderItems\[\{Slot:(-?\d+)b\}\]\.count set value (\d+)", command)
+        if entity_modify:
+            player, slot, count = entity_modify.group(1), int(entity_modify.group(2)), int(entity_modify.group(3))
+            self.ender_items[player] = [(s, item, count if s == slot else old) for s, item, old in self.ender_items.get(player, [])]
+            return "Modified entity data"
         if "data get block" in command:
             match = re.search(r"data get block (-?\d+) (-?\d+) (-?\d+)", command)
             pos = tuple(int(v) for v in match.groups())

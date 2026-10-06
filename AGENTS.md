@@ -8,8 +8,12 @@ and persistent template-based settlement construction. Read `README.md` for the
 full configuration and admin contract before changing behavior.
 
 - `director.py`: environment configuration, RCON client, log/player monitoring,
-  quest generation, offering consumption, vanilla rewards, quest JSON state,
-  and settlement integration. Configuration is read at module import.
+  adaptive communal/private quest generation, chest/ender offering transactions,
+  vanilla rewards, quest JSON state, and settlement integration. Configuration is
+  read at module import.
+- `quest_supply.py`: standard-library Anvil supply observation, Java 26.3
+  inventory parsing, bounded player strength profiles, and fail-closed candidate
+  context. It never emits commands or accepts model-authored IDs/scores.
 - `settlement.py`: `StructureManager`; trusted registry/config validation,
   plot inspection, placement/upgrades/removal, staged jobs, SQLite persistence,
   XP/unlocks, initialization, and constrained model actions.
@@ -55,7 +59,11 @@ by default; enabling them requires both `DIRECTOR_SETTLEMENT_ENABLED=1` and
   interrupted/unacknowledged operations protect the plot and must not be replayed
   blindly. Initialization's durable started flag prevents starter recreation.
 - Quest completion persists reward debt before consuming offerings; idempotency
-  keys prevent duplicate XP/building rewards. Preserve **both** quest JSON
+  keys prevent duplicate XP/building rewards. Communal quests use only the
+  configured loaded normal chest and reward eligible online players at completion;
+  private quests use only the target player's ender chest and reward only that
+  target. Never fall back to player inventories, guessed coordinates, arbitrary
+  item IDs, or model-authored scores. Preserve **both** quest JSON
   (`DIRECTOR_STATE`) and SQLite (`DIRECTOR_DATABASE`), plus the matching world
   and configuration. Never run two Director loops against the same quest JSON.
 - `world_id` is a stable world identity, not a retry switch. Do not delete the DB,
@@ -85,7 +93,10 @@ validate rotations as well as unrotated footprints.
 
 For RCON/world changes, also smoke the actual Java test server below. Start with
 an admin dry-run and inspect plot availability before any live construction.
-Do not use a startup or construction retry as a recovery mechanism.
+Village-temple generation and adaptive offerings target Java 26.3; the existing
+settlement construction test server remains Java 1.21.1 and must not be used as
+proof of temple generation. Do not use a startup or construction retry as a
+recovery mechanism.
 
 Previously verified on Java 1.21.1: dry-run immutability, staged workshop
 construction, chest rejection, owned cottage-to-house upgrade, safe removal,
