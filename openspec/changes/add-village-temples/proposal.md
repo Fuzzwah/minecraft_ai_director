@@ -30,5 +30,5 @@ None. The project currently has no accepted OpenSpec capability specifications.
 
 - New generation assets under `datapack/director_village_temples/`; the existing `datapack/director_buildings/` remains unchanged for Java 1.21–1.21.1.
 - Deterministic standard-library asset tooling and consumer-visible NBT/geometry regression coverage, reusing existing test conventions where compatible.
-- Live deployment documentation, a rehearsed regeneration procedure, and the existing user-systemd Quadlets outside the repository. Host port **25555**, private RCON, and other Minecraft worlds remain unchanged.
+- This is greenfield implementation: no migration runbook or cutover/rollback rehearsal is required. Live regeneration remains a separately authorized post-merge deployment governed by `live-world-regeneration`; host port **25555**, private RCON, and other Minecraft worlds remain unchanged.
 - No external LLM calls, new Python runtime dependencies, or changes to quest/reward behavior are required.

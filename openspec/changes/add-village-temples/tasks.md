@@ -20,18 +20,9 @@
 - [ ] 2.7 Inspect temple rendering and player traversal with an ordinary Java 26.3 client when available; record screenshots/coordinates and actual outcomes, or explicitly report the unavailable client-only surface without claiming it was verified.
 - [ ] 2.8 Record isolated generation evidence and verification limits in README; verify documentation distinguishes observed block/runtime behavior from client visual proof and remove disposable fixtures from the deployable pack.
 
-## 3. Rehearsed regeneration and paired rollback procedure
-
-- [ ] 3.1 Write the operator runbook in README for target/version/commit checks, explicit reset authorization, stopped-generation private snapshots, checksum verification, fresh replacement volume pairs, preserved server policy/secret references, explicit seed, and pre-generation pack installation; verify every step names only the designated live deployment or its disposable rehearsal equivalent.
-- [ ] 3.2 Rehearse the runbook with disposable old/new volume pairs, including temporarily runtime-masking the auto-started Director during Minecraft-only acceptance; verify the old pair stays intact and no Director starts before new spawn/state are ready.
-- [ ] 3.3 Rehearse fresh-state startup after deriving actual world spawn; verify no old player positions, active quest, pending debt, structure record, or initialization state is inherited and exactly one Director authenticates over private RCON.
-- [ ] 3.4 Rehearse failed-backup, wrong-target/version, and rejected-pack gates; verify each stops cutover before the old generation is lost or the new world is accepted for normal play.
-- [ ] 3.5 Rehearse paired rollback, restoring data/state references and spawn settings together before unmasking the companion; verify original world/player edits, quest state, authentication policy, and intended port return without mixed-generation records.
-- [ ] 3.6 Update AGENTS and README with the rehearsed runbook, reset/player-progress consequences, rollback ownership, and the requirement to take a new backup after further play; verify these instructions agree with the actual service dependency behavior and rehearsal evidence.
-
 ## Workflow follow-up
 
 - Review and integrate completed implementation through the existing shipping workflow; keep the live service attached to primary `main`, never the implementation worktree.
-- After the reviewed merge and separate authorization acknowledging world/player-progress reset, execute the rehearsed live cutover on `10.1.1.232:25555`. Take a fresh matched snapshot; the previous pre-temple backup is not automatically current.
+- After the reviewed merge and separate authorization acknowledging world/player-progress reset, regenerate the designated live world on `10.1.1.232:25555` under the existing safety requirements. Take a fresh matched snapshot; the previous pre-temple backup is not automatically current. No migration runbook or cutover/rollback rehearsal is required for this greenfield implementation.
 - Before normal play, verify the actual live enabled pack, naturally generated temple coordinates, Minecraft status, fresh Director ownership/RCON, and save/restart persistence; report any remaining client-only verification limit. Roll back the complete old generation if acceptance fails.
 - Archive this change after implementation and the agreed deployment/review requirements are satisfied; synchronize the two capability specifications and preserve accurate verification evidence.

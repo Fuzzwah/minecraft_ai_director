@@ -16,7 +16,7 @@ The existing `director_buildings` pack is format 48. `tests/support.py::read_tem
 
 ## Goals / Non-Goals
 
-**Goals:** make the mandatory root itself contain the temple; preserve root connectivity and vanilla site selection; isolate generation assets from managed settlement construction; make asset output reproducible; make live cutover reversible.
+**Goals:** make the mandatory root itself contain the temple; preserve root connectivity and vanilla site selection; isolate generation assets from managed settlement construction; make asset output reproducible.
 
 **Non-goals:** any periodic village scanner, post-generation placement loop, automatic terrain clearing around player builds, or adoption of generated villages into the settlement database. The proposal lists gameplay exclusions, including player-edit protection and new turn-in locations.
 
@@ -52,20 +52,13 @@ Rehearse on a separate disposable Java 26.3 world: natural villages in all five 
 
 Generation is entirely Minecraft's responsibility. Keep the Director, current quest turn-in behavior, and settlement enablement unchanged. Generated temples are not recorded as owned settlement buildings and are not eligible for Director upgrade/removal merely because the template resembles a managed shrine. No new model prompt, billable call, global village registry, or runtime scan is needed.
 
-### 5. A paired replacement generation, with old volumes retained
+### 5. Greenfield implementation; deployment is separate
 
-Use a documented operator runbook rather than a new general-purpose deployment framework. After implementation is reviewed, merged, and deployed from primary `main`, create a fresh data/state volume pair for this generation and update only the designated live Quadlet volume references. Keep the previous pair intact as well as taking a fresh stopped-generation archive snapshot. This avoids deleting the sole rollback copy and makes paired rollback explicit.
-
-Preserve server policy/configuration and administrative allowlists, not old terrain, world-local player data, quest debt, or settlement records. Reuse existing private environment files and Podman secret references without placing their contents in the repository. Default to current seed **-4643071103847636909**, set it explicitly for new-world creation, and preserve existing survival/authentication settings. A different seed requires an operator decision.
-
-The world reset includes player progress; approval of the proposal is not a live-cutover command. The operator must acknowledge that reset when authorizing deployment. No player-data migration is included.
-
-The current server unit wants the Director unit, so starting Minecraft normally
-also starts the companion. During server-only acceptance, runtime-mask the
-Director service before starting Minecraft and verify it remains inactive.
-Unmask it only after fresh state and spawn settings are ready, or after restoring
-the complete old generation during rollback. This is a temporary cutover control,
-not a permanent change to normal service dependencies.
+The user requires no migration planning or cutover/rollback rehearsal for this
+greenfield implementation. Build and verify the generation feature only.
+Live regeneration remains a separately authorized post-merge operation, subject
+to the existing `live-world-regeneration` specification and repository safety
+invariants. Applying this change does not authorize replacing any live data.
 
 ## Risks / Trade-offs
 
@@ -74,17 +67,18 @@ not a permanent change to normal service dependencies.
 - **A missed rare root breaks the every-village guarantee** → Cover all 32 effective root selections, including abandoned boundaries, in semantic asset checks and controlled runtime generation.
 - **26.3 schema differs from the existing pack** → Pin version/provenance, use the observed palette schema, and require clean 26.3 startup and actual generation before acceptance.
 - **Keeping the seed keeps the mountain at spawn** → This change does not flatten terrain or promise a spawn temple. Record actual new spawn and a nearby temple's coordinates for playtesters.
-- **Player builds/progress are reset** → Separate deployment approval, current matched backups, retained old volume pair, and explicit rollback. Do not carry old quest/building state into new terrain.
+- **Player builds/progress are reset at later deployment** → Separate reset authorization and existing matched-backup/fresh-state safeguards remain required; no migration tooling or rehearsal is part of implementation.
 - **Other packs overriding town centers can invalidate coverage** → Declare the conflict, inspect the enabled stack, and reject live acceptance if effective village starts do not contain the authored roots; do not promise arbitrary worldgen-pack interoperability.
 - **No player protection is supplied** → Describe temples as generated buildings, not protected zones. A separate proposal is required for edit protection or a protected spawn village.
 
-## Migration Plan
+## Deployment boundary
 
-1. Review these artifacts; push planning on `main`. Create/synchronize a feature worktree from that planning commit and run `/opsx-apply` there only. Implementation and task-progress changes stay on the feature branch.
-2. Build and verify the pack in isolated Java 26.3 worlds. Rehearse cutover and paired rollback with disposable volume pairs. Update README/AGENTS operational references as part of implementation, then integrate reviewed implementation through the existing shipping workflow.
-3. Before live cutover, verify designated container/service identity, source commit, effective generation pack, access policy, seed, and volume mappings. Obtain explicit authorization covering world and player-progress reset.
-4. Stop the Director, flush the world, stop Minecraft, and take a fresh complete data/state snapshot under `/home/fuz/mc-ai-director-backups/`. Check archive contents/checksums, protect snapshot permissions, and save the prior Quadlet references and spawn settings in private rollback metadata. The earlier pre-temple snapshot is historical evidence, not a substitute for a current backup.
-5. Create the replacement data/state volumes. Preserve server settings and administrative access files without copying `world/` or its player data. Pre-create the configured level directory with the new pack in its `datapacks/` directory, and ensure it is enabled for the first generation. Apply the explicit seed and switch both services' volume references as one offline cutover.
-6. Runtime-mask the companion service to inhibit its existing automatic start dependency, then start Minecraft alone. Keep normal player access gated during acceptance, verify enabled pack/startup logs, locate a naturally generated village, and inspect its temple. Save/restart and check persistence. Restore the normal access policy only after acceptance.
-7. Read actual spawn from the new world's metadata and update Director spawn settings. Unmask and start exactly one Director against the fresh state, verify authenticated RCON and persistent-state ownership, and record connection/version plus a temple's coordinates. Leave settlement construction disabled unless separately configured and approved.
-8. If checks fail, stop writers and Minecraft; restore the previous data/state pair and deployment/spawn settings together before unmasking the companion. Verify the original seed/state and private RCON on port 25555 before resuming play. Retain failed-generation evidence privately rather than deleting or mixing it into old state.
+Push reviewed planning on `main`, implement and verify in a feature worktree,
+and integrate through the existing shipping workflow. Deploy only reviewed,
+merged source from primary `main`.
+
+After the merge, the operator may separately authorize regeneration of
+`10.1.1.232:25555`, acknowledging the world/player-progress reset. Preserve a
+fresh matched snapshot, install the verified pack before new generation, use
+fresh Director state, derive actual spawn, and verify the live runtime before
+normal play. Existing backup and paired-rollback safeguards are unchanged.
