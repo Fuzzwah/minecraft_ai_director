@@ -6,9 +6,10 @@ context: |
   Multiple independent Minecraft worlds exist on this host. Never replace,
   reset, or mutate an unrelated world, and never run concurrent Director writers
   against the same persistent state.
-  The prepared settlement playtest uses Java 1.21.1; the default-port survival
-  deployment uses Java 26.3. Do not assume datapacks, templates, or RCON responses
-  are compatible across versions. State the target version and verify it.
+  The prepared settlement playtest uses Java 1.21.1; the long-lived live survival
+  deployment uses Java 26.3 at 10.1.1.232:25555, running source from primary main.
+  Do not assume datapacks, templates, or RCON responses are compatible across
+  versions. State the target version and verify it.
   Repository configuration is not deployed world state. Installing or running
   code alone does not provision buildings, enable settlements, or protect players'
   surroundings. Director protected regions are not player block-edit protection.
@@ -17,6 +18,9 @@ context: |
   Models select validated IDs and actions, never executable commands, arbitrary
   coordinates, or template paths. Preserve durable mutation intent and fail closed
   on uncertain world or inventory changes.
+  Village-temple deployment requires regenerating only the live server's world,
+  after the generation feature is installed and verified for Java 26.3. Preserve
+  the old world and Director state together; use fresh state for regenerated terrain.
 
 rules:
   proposal:

@@ -122,6 +122,39 @@ removal, and world/SQLite persistence through restart. Those checks do **not**
 prove visual client rendering or authenticated player quest completion; those
 require a Minecraft client. Update `README.md` when the operating contract changes.
 
+## Long-lived live server on this host
+
+The persistent player-facing server is **`10.1.1.232:25555`, Java 26.3**.
+It is distinct from the isolated settlement test server and other family worlds.
+
+- Minecraft container/service: `mc_ai_director_default` /
+  `mc_ai_director_default.service`.
+- Director container/service: `mc_ai_director_default_keeper` /
+  `mc_ai_director_default_keeper.service`.
+- Source: `/home/fuz/code/minecraft_ai_director`, the primary `main` checkout,
+  mounted read-only at `/app`. Restart the Director to load reviewed source changes;
+  do not point the live server at an implementation worktree.
+- Persistent volumes: `mc_ai_director_default_data` (world/server data) and
+  `mc_ai_director_default_state` (quest JSON and settlement database).
+- Rollback snapshots live under `/home/fuz/mc-ai-director-backups/`; archive pairs
+  and their checksums are recorded in each snapshot's `manifest.json`. Snapshots
+  include private server settings: keep directories owner-only and files private.
+- Quadlets: `~/.config/containers/systemd/mc_ai_director_default*.container`.
+  Host port **25555** maps to Minecraft's internal **25565**; RCON stays private
+  inside the shared server network namespace at **25575**.
+- Stop the Director before restarting/stopping Minecraft. Use user systemd services
+  for lifecycle operations; do not independently recreate their managed containers.
+
+The user requires this live world's regeneration for the village-temple feature.
+Do not regenerate it before the generation feature is implemented, installed,
+and verified for Java 26.3. First stop writers and preserve the complete server
+and Director volumes as a matching rollback snapshot. The replacement world
+needs fresh Director state and a new settlement world identity if settlements
+are enabled; do not attach old quest/building records to regenerated terrain.
+Install the generation datapack before the new world's first generation, then
+verify generated temples, recompute spawn coordinates, and verify the Director.
+The isolated test server and unrelated family worlds must not be regenerated.
+
 ## Isolated test server on this host
 
 Run rootless Podman as **`fuz`**, not `sudo podman` (root has a different container

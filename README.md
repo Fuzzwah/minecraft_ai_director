@@ -8,6 +8,37 @@ Settlement construction extends the same trust boundary: the model requests
 approved building IDs; Python owns coordinates, templates, validation, scheduling,
 and world mutation. Model responses are never executed as commands.
 
+## Long-lived live server
+
+Connect to **`10.1.1.232:25555`** with Minecraft Java **26.3**. The persistent
+server is `mc_ai_director_default`, with companion `mc_ai_director_default_keeper`.
+The names are retained for continuity; this server no longer uses host port 25565.
+The Director loads source from the primary `main` checkout at
+`/home/fuz/code/minecraft_ai_director`, not an implementation worktree.
+
+```bash
+systemctl --user stop mc_ai_director_default_keeper.service
+systemctl --user restart mc_ai_director_default.service
+systemctl --user start mc_ai_director_default_keeper.service
+podman exec mc_ai_director_default rcon-cli list
+podman logs -f mc_ai_director_default_keeper
+```
+
+World/server data and Director state persist in `mc_ai_director_default_data`
+and `mc_ai_director_default_state`; RCON is not published on the host.
+The separate hardcore server uses port 25567.
+
+Matched rollback snapshots are stored under `/home/fuz/mc-ai-director-backups/`
+with a checksum manifest. Take a fresh snapshot immediately before the future
+regeneration if the existing world has been played since its last backup.
+
+**Village-temple deployment requires regenerating this live world**, but only
+after the generation feature is implemented and verified for Java 26.3.
+Preserve both existing volumes as a rollback snapshot before regeneration.
+Install the generation datapack before creating the replacement world; use fresh
+Director state, recompute spawn, and verify generated temples before playtesting.
+The existing construction templates alone do not add temples to vanilla villages.
+
 ## Run the existing Director
 
 Requires Python 3.10+ and a Java server with RCON enabled. Keep RCON private.
