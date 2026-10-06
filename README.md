@@ -39,6 +39,42 @@ Install the generation datapack before creating the replacement world; use fresh
 Director state, recompute spawn, and verify generated temples before playtesting.
 The existing construction templates alone do not add temples to vanilla villages.
 
+### Set world spawn after regeneration
+
+The temple pack does not change Minecraft's world-spawn metadata. During a live
+world regeneration, record the original overworld spawn before replacement.
+After the new Java 26.3 world has generated terrain and the temple pack is
+enabled, locate every supported village type from that recorded position and
+choose the smallest horizontal distance:
+
+```bash
+export ORIGINAL_SPAWN_X=0 ORIGINAL_SPAWN_Y=72 ORIGINAL_SPAWN_Z=0
+for TYPE in plains desert savanna snowy taiga; do
+  podman exec mc_ai_director_default rcon-cli \
+    "execute positioned $ORIGINAL_SPAWN_X $ORIGINAL_SPAWN_Y $ORIGINAL_SPAWN_Z run locate structure minecraft:village_$TYPE"
+done
+```
+
+Do not accept a guessed coordinate or a failed/localized locate response. Load
+and inspect the selected village column, confirm a solid support block and clear
+air above it, then set the world spawn one block above that support. Do not
+clear terrain, force an unsafe spawn, or proceed when the target chunk/state is
+uncertain. Flush the world and verify the persisted spawn metadata before
+starting normal play:
+
+```bash
+podman exec mc_ai_director_default rcon-cli 'setworldspawn <x> <y> <z>'
+podman exec mc_ai_director_default rcon-cli 'save-all flush'
+```
+
+For the current regenerated live world, the nearest result is the taiga village
+at `[112, ~, 32]`. Its verified support is
+`[112, 71, 32] = minecraft:smooth_stone`, so the persisted world spawn is
+`[112, 72, 32]`. This changes only the default world spawn. Beds and respawn
+anchors remain authoritative for players who have set them. The Director's
+quest/turn-in coordinates (`SPAWN_X`, `SPAWN_Y`, `SPAWN_Z`) are a separate
+contract and are not changed by this world-spawn adjustment.
+
 ## Run the existing Director
 
 Requires Python 3.10+ and a Java server with RCON enabled. Keep RCON private.

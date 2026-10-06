@@ -122,6 +122,109 @@ removal, and world/SQLite persistence through restart. Those checks do **not**
 prove visual client rendering or authenticated player quest completion; those
 require a Minecraft client. Update `README.md` when the operating contract changes.
 
+### Evidence screenshots with the official client
+
+The host has an unmodified official Java 26.3 client runtime at
+`/home/fuz/minecraft-client`.
+Reuse it; do not download a second client or commit its files. `launch.json`
+contains the Java command, classpath, natives, assets, username, and sensitive
+authentication values. Never print, copy, or commit those values. A cached token
+may expire; a 401 means the client can render local worlds but cannot join the
+online-mode live server.
+
+A real rendered frame is captured under Xvfb and FFmpeg, not with a map renderer:
+
+```bash
+export CLIENT_ROOT=/home/fuz/minecraft-client
+export CLIENT_GAME=/home/fuz/orca/workspaces/minecraft_ai_director/initial/.runtime/live-view-game
+Xvfb :96 -screen 0 1280x800x24 -nolisten tcp >/tmp/minecraft-xvfb-96.log 2>&1 &
+export XVFB_PID=$!
+trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
+```
+
+Run the client from a disposable game directory. This launcher reuses the
+existing credentials without echoing them and supports either a local copied
+world or an authenticated multiplayer destination:
+
+```bash
+# Leave CLIENT_DESTINATION unset for the local copied world; export it for live multiplayer.
+DISPLAY=:96 LIBGL_ALWAYS_SOFTWARE=1 \
+  python3 -B - <<'PY'
+import json, os, subprocess
+from pathlib import Path
+
+client = Path(os.environ['CLIENT_ROOT'])
+game = Path(os.environ['CLIENT_GAME'])
+argv = json.loads((client / 'launch.json').read_text())
+for flag in ('--quickPlayMultiplayer', '--quickPlaySingleplayer', '--quickPlayRealms'):
+    while flag in argv:
+        i = argv.index(flag)
+        del argv[i:i + 2]
+for flag, value in (('--gameDir', str(game)), ('--width', '1280'), ('--height', '800')):
+    if flag in argv:
+        argv[argv.index(flag) + 1] = value
+    else:
+        argv.extend((flag, value))
+destination = os.environ.get('CLIENT_DESTINATION', '')
+argv.extend(('--quickPlayMultiplayer', destination) if destination else
+            ('--quickPlaySingleplayer', 'Live Village Temple'))
+env = os.environ.copy()
+env.update({'DISPLAY': ':96', 'LIBGL_ALWAYS_SOFTWARE': '1'})
+raise SystemExit(subprocess.run(argv, env=env).returncode)
+PY
+```
+
+For an authenticated live view, set
+`CLIENT_DESTINATION=10.1.1.232:25555` and use a valid account token. Never
+disable production authentication or use offline placeholder credentials against
+the live server. After the player appears, use private RCON to put that named
+player in spectator mode and teleport it; do not guess the name or issue block
+mutation commands. For a local render, use a copied world and enable commands
+only in that disposable copy if teleportation is needed.
+
+To render the exact live world without joining production, record service state,
+stop writers in order, flush the world, copy only the world, then restore both
+services before inspecting the frame. The following assumes both live services
+were active and must not be run against the isolated test server:
+
+```bash
+export LIVE_DATA=/home/fuz/.local/share/containers/storage/volumes/mc_ai_director_default_data/_data
+export COPY=/home/fuz/orca/workspaces/minecraft_ai_director/initial/.runtime/live-view-game/saves/Live\ Village\ Temple
+systemctl --user stop mc_ai_director_default_keeper.service
+podman exec mc_ai_director_default rcon-cli 'save-all flush'
+systemctl --user stop mc_ai_director_default.service
+
+test ! -e "$COPY" || { echo "choose a new disposable COPY" >&2; exit 1; }
+mkdir -p "$COPY"
+podman unshare cp -a "$LIVE_DATA/world/." "$COPY/"
+podman unshare rm -f "$COPY/session.lock"
+# Map copied files back to the host user; do not change the live volume.
+podman unshare chown -R 0:0 "$COPY"
+
+systemctl --user start mc_ai_director_default.service
+until podman exec mc_ai_director_default rcon-cli list >/dev/null 2>&1; do sleep 2; done
+systemctl --user start mc_ai_director_default_keeper.service
+```
+
+The client may show the first-run accessibility prompt or the experimental-world
+warning; accept those only for the disposable copy. Position the camera with
+spectator movement or local-only commands, press `F1` to hide the HUD, and capture
+an actual frame:
+
+```bash
+ffmpeg -hide_banner -loglevel error \
+  -f x11grab -video_size 1280x800 -i :96 \
+  -frames:v 1 -y .runtime/live/temple-evidence.png
+```
+
+Inspect the PNG before reporting it. A local copied-world frame proves rendered
+appearance and exact copied-world contents, not authenticated multiplayer
+behavior. For the latter, capture while connected to the live destination with a
+valid account. Afterward stop the client and the Xvfb process you started, kick
+any evidence player from the live server, and verify both live services are active
+with zero unintended players. Keep evidence images and disposable client game
+folders under ignored `.runtime/`; never put them in the datapack or commit them.
+
 ## Long-lived live server on this host
 
 The persistent player-facing server is **`10.1.1.232:25555`, Java 26.3**.
@@ -152,8 +255,13 @@ and Director volumes as a matching rollback snapshot. The replacement world
 needs fresh Director state and a new settlement world identity if settlements
 are enabled; do not attach old quest/building records to regenerated terrain.
 Install the generation datapack before the new world's first generation, then
-verify generated temples, recompute spawn coordinates, and verify the Director.
-The isolated test server and unrelated family worlds must not be regenerated.
+verify generated temples, derive the nearest supported village from the recorded
+original spawn, set world spawn only at an inspected safe surface above solid
+terrain, and verify the persisted result. A failed locate, unloaded/uncertain
+column, or unsafe surface stops acceptance; do not guess coordinates, clear
+terrain, or use a fallback village. The Director's quest/turn-in spawn
+configuration is separate from Minecraft world spawn and is not changed by this
+step. The isolated test server and unrelated family worlds must not be regenerated.
 
 ## Isolated test server on this host
 
