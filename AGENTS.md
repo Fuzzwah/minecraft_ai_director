@@ -125,7 +125,7 @@ require a Minecraft client. Update `README.md` when the operating contract chang
 ### Evidence screenshots with the official client
 
 The host has an unmodified official Java 26.3 client runtime at
-`/home/fuz/orca/workspaces/minecraft_ai_director/initial/.runtime/official-client`.
+`/home/fuz/minecraft-client`.
 Reuse it; do not download a second client or commit its files. `launch.json`
 contains the Java command, classpath, natives, assets, username, and sensitive
 authentication values. Never print, copy, or commit those values. A cached token
@@ -135,7 +135,7 @@ online-mode live server.
 A real rendered frame is captured under Xvfb and FFmpeg, not with a map renderer:
 
 ```bash
-export CLIENT_ROOT=/home/fuz/orca/workspaces/minecraft_ai_director/initial/.runtime/official-client
+export CLIENT_ROOT=/home/fuz/minecraft-client
 export CLIENT_GAME=/home/fuz/orca/workspaces/minecraft_ai_director/initial/.runtime/live-view-game
 Xvfb :96 -screen 0 1280x800x24 -nolisten tcp >/tmp/minecraft-xvfb-96.log 2>&1 &
 export XVFB_PID=$!
