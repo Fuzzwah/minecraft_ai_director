@@ -1,0 +1,13 @@
+{
+  "pack": {
+    "description": "Keeper temples in every vanilla village — Java 26.3 only",
+    "min_format": [
+      121,
+      0
+    ],
+    "max_format": [
+      121,
+      0
+    ]
+  }
+}
