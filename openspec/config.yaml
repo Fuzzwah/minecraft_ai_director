@@ -1,0 +1,41 @@
+schema: spec-driven
+
+context: |
+  Read AGENTS.md and README.md before planning or applying changes; retain their
+  safety and persistence invariants. Keep the Python runtime standard-library-only.
+  Multiple independent Minecraft worlds exist on this host. Never replace,
+  reset, or mutate an unrelated world, and never run concurrent Director writers
+  against the same persistent state.
+  The prepared settlement playtest uses Java 1.21.1; the long-lived live survival
+  deployment uses Java 26.3 at 10.1.1.232:25555, running source from primary main.
+  Do not assume datapacks, templates, or RCON responses are compatible across
+  versions. State the target version and verify it.
+  Repository configuration is not deployed world state. Installing or running
+  code alone does not provision buildings, enable settlements, or protect players'
+  surroundings. Director protected regions are not player block-edit protection.
+  Planning must not start or restart servers, alter worlds, or enable billable
+  model calls. Keep credentials and private environment files out of artifacts.
+  Models select validated IDs and actions, never executable commands, arbitrary
+  coordinates, or template paths. Preserve durable mutation intent and fail closed
+  on uncertain world or inventory changes.
+  Village-temple deployment requires regenerating only the live server's world,
+  after the generation feature is installed and verified for Java 26.3. Preserve
+  the old world and Director state together; use fresh state for regenerated terrain.
+
+rules:
+  proposal:
+    - State the user-visible outcome, scope, and explicit non-goals.
+  specs:
+    - Use observable requirements and WHEN/THEN scenarios, including relevant failure and persistence boundaries.
+  design:
+    - Separate code changes from deployment steps; identify world/version compatibility, backups, and recovery for persistent mutations.
+  tasks:
+    - Include existing regression checks and a smoke of the changed surface; identify any Minecraft-client-only verification.
+
+operations:
+  apply:
+    guidance:
+      - Do not mark tasks complete using mocked RCON or unit tests as evidence of live world placement or visual client behavior.
+  archive:
+    guidance:
+      - Record exercised verification and any unverified client surface accurately.
