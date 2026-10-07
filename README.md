@@ -226,6 +226,27 @@ harvesting there remain unverified. Copied production village data no longer
 produced phantom carrots; its verified local wheat yield was below the opening
 minimum, which correctly defers assignment rather than fabricating supply.
 
+Current-world rollout: [PR #8](https://github.com/Fuzzwah/minecraft_ai_director/pull/8)
+was merged and installed from primary `main` on `10.1.1.232:25555`. With both
+writers stopped, complete paired data/state archives and a private checksummed
+manifest were saved under
+`/home/fuz/mc-ai-director-backups/live-quest-warmup-20261007T042848Z/`.
+The existing carrot10 and private building-log6 quests were retired without
+consumption, rewards, or completion credit. A writer-stopped read-only preview
+preserved quest JSON and chest contents and found one mature wheat plus two
+string items: no opening item reaches its minimum, so assignment correctly
+defers until verified local harvestable yield is sufficient. Do not widen the
+radius, invent supply, or move the hub/chest to bypass that result.
+
+The world-generation record, persisted spawn `352, 74, -832`, normal chest
+`356, 74, -835`, and structure/settlement configuration checksums were unchanged.
+The single Director was restarted and retained the migration without repeating
+retirement; both live services were active with zero players. No terrain
+regeneration, state reset, billable acceptance call, or uncertain replay occurred.
+Starting Minecraft also activates its wanted Keeper service; explicitly stop
+that writer again before a writer-stopped preview rather than assuming it stayed
+stopped. Authenticated production client access remains unverified.
+
 ## Safely enable settlements
 
 1. Back up the Minecraft world and Director state.
