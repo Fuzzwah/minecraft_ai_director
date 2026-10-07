@@ -39,6 +39,14 @@ Install the generation datapack before creating the replacement world; use fresh
 Director state, recompute spawn, and verify generated temples before playtesting.
 The existing construction templates alone do not add temples to vanilla villages.
 
+Regeneration is a destructive cutover. Stop the Director writer first, flush and
+snapshot the complete Minecraft and Director volumes as one matched pair, then
+create a new random-seed world with the verified Java 26.3 temple pack already
+installed. Provision a new quest JSON, settlement database, and settlement
+`world_id`; never reuse old records with new terrain. If any placement, spawn,
+container, Director, persistence, or uncertainty check fails, stop both writers
+and restore the matched snapshot instead of retrying or mixing state.
+
 ### Set world spawn after regeneration
 
 The temple pack does not change Minecraft's world-spawn metadata. During a live
@@ -74,7 +82,6 @@ at `[112, ~, 32]`. Its verified support is
 anchors remain authoritative for players who have set them. The Director's
 quest/turn-in coordinates (`SPAWN_X`, `SPAWN_Y`, `SPAWN_Z`) are a separate
 contract and are not changed by this world-spawn adjustment.
-
 ## Run the existing Director
 
 Requires Python 3.10+ and a Java server with RCON enabled. Keep RCON private.
@@ -94,19 +101,59 @@ For an OpenAI-compatible endpoint, set `LLM_URL`, `LLM_MODEL`, and optionally
 `DIRECTOR_STATE` (default `director_state.json`). Older saves are loaded with
 stable quest IDs and empty settlement rewards.
 
-A local `director.env` is Git-ignored but is not loaded automatically. Keep it
-owner-only (`chmod 600 director.env`) and load it with
-`set -a; source ./director.env; set +a` in Bash before starting the Director.
-Never commit API keys or RCON credentials.
-
 Settlement integration is **off by default**. Existing quests, item rewards,
 player detection, log monitoring, and LLM quest generation do not require it.
+
+## Adaptive temple offerings
+
+The Java 26.3 temple datapack adds two containers to every supported normal and
+abandoned town-center root: one empty normal chest for the communal Keeper
+offering and one ender chest for private player offerings. The Python Director
+never accepts chest coordinates, item IDs, quantities, lanes, scores, or rewards
+from the model. Configure the generated temple's communal chest explicitly:
+
+| Variable | Default |
+| --- | --- |
+| `MINECRAFT_WORLD` | `/minecraft/world` |
+| `OFFERING_CHEST_X/Y/Z` | unset; communal quests decline until configured |
+| `SPAWN_SUPPLY_RADIUS` | `64` blocks |
+
+A communal quest uses the configured loaded chest and rewards all eligible online
+players at completion. A private quest uses only its target player's ender chest
+and rewards only that target. Offerings are persisted as prepared, uncertain, or
+completed intents; a lost RCON response stops the Director for reconciliation and
+never replays consumption or rewards. Player-inventory and arbitrary-chest
+fallbacks are not supported.
+
+Candidate items are Python-owned. Spawn-local communal items require a complete
+saved Anvil observation of the bounded village area; private local items may also
+be observed in that target's inventories. Higher early, established, Nether/End,
+and endgame bands require bounded progression scores from experience, equipment,
+and owned materials. A missing or malformed signal lowers confidence and cannot
+unlock an advanced band. The LLM and deterministic fallback receive the same
+filtered candidates, and an empty candidate set produces no quest.
+
+The quest state contains one durable communal quest and one durable private quest
+per eligible player. Preserve this JSON with the matching world; do not attach it
+to regenerated terrain. The observation and RCON contract targets Java 26.3;
+the settlement construction pack remains a separate Java 1.21–1.21.1 artifact.
+
+Acceptance evidence: the disposable Java 26.3 server loaded the temple pack before
+first generation, generated a natural taiga village with an empty chest and ender
+chest, placed controlled roots in all four rotations, and retained them across a
+save/restart. RCON verified Java 26.3 protocol/data versions and exact container
+NBT. Standard-library Director probes read the real saved village supply and
+consumed a partial pumpkin stack while preserving its slot. Unit tests cover
+communal all-online and private target-only rewards, restart persistence, and
+lost-response uncertainty. A rendered client workflow was not verified: the
+cached official client reached Java 26.3 but its authentication token returned
+HTTP 401, so no client joined the offline acceptance server.
 
 ## Safely enable settlements
 
 1. Back up the Minecraft world and Director state.
 2. Install `datapack/director_buildings` into the world's `datapacks` directory.
-   Its real compressed NBT templates target **Java 1.21–1.21.1**, pack format 48.
+   Its real compressed NBT templates target **Java 26.3**, datapack format 121.0.
    Reload datapacks as an administrator. For another Minecraft version, verify
    datapack compatibility before enabling construction.
 3. Edit `config/settlement.json`. Assign a unique, stable `world_id` to this
@@ -305,50 +352,6 @@ the building.
   with larger structures, entities, or block entities without validating and
   updating the registry. RCON cannot attest the server's actual template files.
 
-## Spec-driven development with OpenSpec
-
-[Fission-AI OpenSpec](https://github.com/Fission-AI/OpenSpec) is development-only
-tooling; it adds no Python runtime dependencies. Requires Node.js 20.19+.
-The project was initialized with OpenSpec **1.14.1**, the core workflow,
-Oh My Pi commands, and vendor-neutral shared agent skills:
-
-```bash
-npm install -g @fission-ai/openspec@1.14.1
-openspec init --tools oh-my-pi,agents --profile core --no-animation
-```
-
-Project context and safety rules are in `openspec/config.yaml`. Accepted
-capabilities belong in `openspec/specs/`; proposals and implementation artifacts
-belong in `openspec/changes/`. No feature proposal is created by setup.
-
-In Oh My Pi, use `/opsx-explore` to investigate an idea, then
-`/opsx-propose <idea-or-change-name>` to draft requirements, design, and tasks.
-Review the plan before `/opsx-apply`; use `/opsx-update` to revise it,
-`/opsx-sync` to synchronize delta specs, and `/opsx-archive` after completion.
-Other assistants can use the matching `.agents/skills/openspec-*` skills.
-Restart the assistant session if newly generated commands are not discovered.
-
-Useful terminal commands:
-
-```bash
-openspec list
-openspec list --specs
-openspec validate --all --strict --no-interactive
-openspec doctor
-openspec update
-```
-
-`openspec update` refreshes generated skills and commands. Keep project-specific
-guidance in `openspec/config.yaml` and `AGENTS.md`, not in generated files.
-OpenSpec planning does not deploy datapacks, create temples, enforce player
-protection, or start servers. Those actions need explicit implementation and
-deployment steps targeting the correct world and Minecraft version.
-
-Setup was smoke-checked with `openspec doctor` and an isolated temporary change:
-project context/rules reached artifact instructions, strict validation passed,
-and the planning workflow reached the implementation-ready state. The temporary
-change was removed; no feature implementation or live-world verification occurred.
-
 ## Verification
 
 ```bash
@@ -364,7 +367,10 @@ durable quest reward recovery.
 Live Java 1.21.1 checks also exercised a server-connected dry-run with unchanged
 SQLite bytes, staged workshop construction, protected-chest rejection, an owned
 cottage-to-house upgrade, safe removal, and persisted buildings across restart.
-The server's affirmative template response is
+Live Java 26.3 checks verified fresh-world initialization, exact shrine/storehouse
+blocks, idempotent starter initialization, and a guarded removal dry-run with
+unchanged SQLite bytes. Loaded-plot guards also passed after more than 60 seconds
+without players. The server's affirmative template response remains
 `Loaded template "<resource>" at <x>, <y>, <z>`; acknowledgement must match the
 requested template and translated placement anchor exactly. Unrecognized or
 mismatched acknowledgements still protect the plot rather than replaying it.
@@ -376,7 +382,7 @@ Minecraft client; RCON inspection does not prove those surfaces.
 An isolated rootless Podman deployment is installed outside the repository at
 `/home/fuz/mc-director-village-test`. It does not use an existing family world.
 
-- **Connect with Minecraft Java 1.21.1 to `10.1.1.232:25567`.**
+- **Connect with Minecraft Java 26.3 to `10.1.1.232:25568`.**
 - Creative, peaceful, fresh superflat world; 4 player slots and a 2 GB Java heap.
 - Online account authentication and whitelist are enabled; `CheekyHambone` is
   whitelisted. Add other accounts explicitly with the console control below.
@@ -384,9 +390,9 @@ An isolated rootless Podman deployment is installed outside the repository at
   owner-only `server.env` and `director.env`, not in this repository.
 - The settlement is near `120, -60, -40`; plots use the air layer above the
   flat grass terrain. Registered chunks stay force-loaded.
-- The test state contains the shrine, storehouse, staged workshop, and a Tier 2
-  house. Workshop and house ownership is assigned to `CheekyHambone`;
-  `residential_2` remains available. Test XP is 300, settlement level 3.
+- The fresh 26.3 world starts with the shrine and storehouse, three available
+  plots, and **0 XP, level 1 (Camp)**. No old quests, buildings, or XP were imported.
+  Inspect current state before acting; player activity can change it.
 - The Director runs in **DEMO mode**: collect quests and configured settlement
   XP, with no external LLM calls. Quest interval is 120 seconds. Building controls
   remain available through the admin CLI; AI-selected building rewards require
@@ -401,8 +407,24 @@ TEST_ROOT=/home/fuz/mc-director-village-test
 "$TEST_ROOT/server.sh" console whitelist add YourMinecraftName
 "$TEST_ROOT/director.sh" admin show settlement
 "$TEST_ROOT/director.sh" admin list plots
-DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin construct cottage_tier_1 residential_2 --owner CheekyHambone
+DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin remove structure civic_center
 ```
+
+The removal example is a **preview only**; never omit `DIRECTOR_DRY_RUN=1`
+for this smoke check. It requires an unchanged, unoccupied shrine. A cottage
+construction preview is locked at the fresh world's starting XP.
+
+For human testing, join as a whitelisted account, read the Keeper's collect
+quest, and carry the requested items in your inventory within six blocks of
+`120, -60, -40`. Confirm consumption, completion chat/title, vanilla rewards,
+and settlement XP. DEMO mode does not select structure rewards.
+
+The previous 1.21.1 world and its paired Director/configuration state are retained
+at `/home/fuz/mc-director-village-test/backups/20261006-before-26.3-fresh-world-94fb5220`.
+The new world uses a distinct world ID and seed. Rollback must restore the old
+world, world identity, Director state, and matching server version together;
+never attach the old database to the fresh world. Port 25567 now belongs to the
+unrelated `mc_hardcore` server; leave it alone.
 
 Lifecycle controls are `start`, `stop`, and `restart` on each script. Stop the
 Director before stopping/restarting Minecraft; start Minecraft before the
@@ -414,111 +436,15 @@ The Minecraft container uses `slirp4netns` port forwarding: this avoids the
 host's observed `pasta` restart/rebind failure. The Director container uses an
 init process and SIGINT shutdown so state connections close cleanly.
 
+Keep `PAUSE_WHEN_EMPTY_SECONDS=-1` in the Minecraft environment. Java 26.3's
+native `pause-when-empty-seconds` otherwise defaults to 60; RCON connectivity and
+force-load tickets alone did not make paused chunks available to construction.
+`ENABLE_AUTOPAUSE=false` disables only the image's separate autopause mechanism.
+The rootless Minecraft volume has mapped ownership; move it with
+`podman unshare` while stopped rather than changing ownership recursively.
+
 The host's user Podman config, `/home/fuz/.config/containers/containers.conf`,
 sets `[engine]` with `cgroup_manager = "cgroupfs"`. This explicitly selects the
 existing fallback backend when no systemd user session is available, preventing
 the repeated systemd/linger/fallback warnings without suppressing other warnings.
 It applies to all Podman commands run as `fuz`; no container restart is needed.
-
-## Village-temple generation — Java 26.3
-
-`datapack/director_village_temples/` puts one Keeper temple in the mandatory
-town center of each newly generated plains, desert, savanna, snowy, or taiga
-village, including abandoned villages. It replaces all 32 selectable roots,
-not optional house entries. The five root pools retain vanilla ordering,
-weights, processors, and rigid projection; normal single-pool elements honor
-the temple's explicit interior air. Village sites, frequency, and biome
-eligibility remain vanilla.
-
-Each temple has a biome-appropriate 5×5 shell and roof, an open entrance, and a
-chiseled-stone-brick altar capped with a smooth-stone slab. Original road joints
-are retained; the per-root manifest records ancillary connector relocations.
-Abandoned processors may weather walls without removing the roof, altar,
-supported floor, or entry clearance.
-
-### Install and use
-
-This separate pack targets **Java 26.3 only**: exact data-pack version **121.0**,
-DataVersion **5023**, protocol **777**. Copy its whole directory into the chosen
-world's `datapacks/` before that world's first generation; pre-create the level
-directory if necessary. On startup, inspect logs and `datapack list enabled`:
-`file/director_village_temples` must be enabled without registry/template errors.
-Installation into an existing world affects only new village starts; it does
-not retrofit explored villages or overwrite player edits.
-
-Packs overriding `minecraft:village/<style>/town_centers` or the corresponding
-root templates conflict with the mandatory-temple guarantee. Verify the
-effective pack stack rather than assuming arbitrary worldgen interoperability.
-Disposable test dimensions/pools are not part of this deployable pack.
-
-Generation needs no Director, settlement initialization, online player, model
-request, mod, or Python process. Generated temples are ordinary editable world
-blocks, not Director-owned buildings, protected zones, new quest turn-in sites,
-or settlement rewards. This does not guarantee a temple at spawn, flatten
-terrain, or increase village frequency. `director_buildings` and its registry
-remain unchanged at Java **1.21–1.21.1**, format **48**.
-
-### Reproduce and inspect assets
-
-Standard-library development tooling; the server archive is not committed or
-needed at runtime. Set `SERVER_ARCHIVE` to the actual 26.3 archive containing
-`data/` and `version.json` (the extracted `versions/26.3/server-26.3.jar`, not
-the outer server bootstrap JAR):
-
-```bash
-python3 -B tools/village_temples.py --archive "$SERVER_ARCHIVE"
-python3 -B tools/village_temples.py --check
-python3 -B -m unittest discover -v
-```
-
-The archive SHA-256 is pinned to
-`a362163eec5d1612d520772bc16e5b39c09e3b234fdc045f56bf544284ee8ae6`.
-`tools/village_temple_recipes.json` supplies all 32 explicit room placements.
-The generated `manifest.json` records archive/image/version provenance, source
-pools/processors, geometry, and connector changes. `--output PATH` writes or
-checks an alternate pack directory. The type-preserving NBT codec handles Java
-tag types and modified UTF-8; gzip output is deterministic.
-
-Semantic checks decode real assets and cover effective normal/abandoned
-selection boundaries, exactly one altar, roof/walls, explicit room clearance,
-supported floors, road accessibility, processor outcomes, and all rotations.
-They reject missing rare roots, obstructed entrances, broken floors/roofs,
-duplicate altars, and altered trusted joints. Asset checks do not replace actual
-server generation or client rendering/traversal checks.
-
-### Isolated Java 26.3 evidence and limits
-
-The disposable Java 26.3 fixture server loaded
-`file/director_village_temples` before generation and accepted the pack without
-registry, template, or startup errors. Controlled fixture placement issued the
-server's `Loaded template` response for the authored root resources, including
-normal and abandoned roots and all four rotation values. The actual generated
-block data was inspected separately from the committed NBT; it showed the
-chiseled-stone-brick altar base, roof blocks, and open entry in rotated
-placements. Vanilla jigsaw assembly was exercised from each of the five town
-center pools, including uneven natural terrain. The fixture-only root pools and
-temporary dimensions stayed outside `datapack/director_village_temples`.
-
-For the fixed seed `-6123800180571355156`, Java 26.3 reported identical
-`locate structure` results with the pack enabled and with a packless server:
-plains `[-944, -224]`, desert `[-1872, -2080]`, savanna `[-1936, -1632]`,
-snowy `[-3504, -4784]`, and taiga `[2992, -3728]`. This checks runtime site
-selection, not copied JSON. Natural packed-world region inspection found altar
-blocks at the corresponding village sites, including plains `[-957, 68, -214]`,
-desert `[-1867, 64, -2074]`, savanna near `[-1949, 67, -1625]`, snowy
-`[-3509, 99, -4788]`, and taiga near `[2994, 66, -3734]`.
-
-Installing the pack after a scratch plains village already existed preserved a
-player-edited gold block at `[96, 101, 96]`; a later packed desert town center
-was generated at `[300, 100, 100]`. A packed scratch temple placed at `[500,
-100, 100]` was edited at its altar, saved, unloaded, and restarted. After the
-restart the gold edit remained, the altar base remained present, and region
-inspection found exactly one altar-base block in that template volume. No
-Director process was involved in these generation or persistence checks.
-
-No ordinary Java 26.3 client or launcher was available in the verification
-environment. RCON and region inspection prove server-side blocks and
-persistence only; screenshots, client rendering, and player traversal remain
-unverified. Generated temples are ordinary editable world blocks, not
-protected zones. The disposable containers and fixture assets are not part of
-the deployable pack.

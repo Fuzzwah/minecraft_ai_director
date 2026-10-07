@@ -10,7 +10,7 @@ description: Release the Minecraft AI Director through a verified topic-branch P
 - Repository: `Fuzzwah/minecraft_ai_director`, remote `origin` at
   `git@github.com:Fuzzwah/minecraft_ai_director.git`.
 - Component: standard-library Python quest Director and optional durable
-  settlement construction, including trusted Java 1.21–1.21.1 datapack assets.
+  settlement construction, including trusted Java 26.3 datapack assets.
 - Resolve the current root with `git rev-parse --show-toplevel`; do not switch
   repositories. This host's checkout is
   `/home/fuz/orca/workspaces/minecraft_ai_director/village`.
@@ -50,15 +50,16 @@ build step, or GitHub Actions workflow at this release; do not invent a gate.
 Inspect remote protection/rules on each release rather than assuming they remain
 unchanged.
 
-For RCON/construction changes, require real Java 1.21.1 smoke evidence in the
-isolated test world. The settlement feature already has live evidence for staged
-workshop construction, chest rejection, owned upgrade, safe removal, and
-world/SQLite persistence through restart. Re-exercise changed behavior on future
-releases; do not claim client rendering or authenticated quest completion from
-RCON alone.
+For RCON/construction changes, require real Java 26.3 smoke evidence in the
+isolated test world. Historical Java 1.21.1 evidence covered staged workshop
+construction, chest rejection, owned upgrade, safe removal, and restart
+persistence. Fresh 26.3 evidence covers starter placement and exact blocks,
+idempotent initialization, guarded removal preview, and loaded chunks past the
+idle threshold. Re-exercise changed behavior on future releases; do not claim
+client rendering or authenticated quest completion from RCON alone.
 
-For this release, confirm the running server, settlement, and a real read-only
-construction preview, with unchanged SQLite checksum:
+For a release, confirm the running server, settlement, and a real read-only
+world-mutation preview, with unchanged SQLite checksum:
 
 ```bash
 export TEST_ROOT=/home/fuz/mc-director-village-test
@@ -68,16 +69,18 @@ export TEST_ROOT=/home/fuz/mc-director-village-test
 "$TEST_ROOT/director.sh" admin show settlement
 "$TEST_ROOT/director.sh" admin list plots
 sha256sum "$TEST_ROOT/director_settlement.sqlite3"
-DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin construct \
-  cottage_tier_1 residential_2 --owner CheekyHambone
+DIRECTOR_DRY_RUN=1 "$TEST_ROOT/director.sh" admin remove structure civic_center
 sha256sum "$TEST_ROOT/director_settlement.sqlite3"
 ```
 
-Inspect availability first. If this plot has legitimately changed, choose another
-compatible free plot, or report that construction smoke is unavailable. Do not
-remove an existing building to manufacture a clear test plot. The checksum must
-match unless an independently observed concurrent Director write occurred; in
-that case isolate writers safely and verify again. No blind mutation retries.
+Inspect current state first. The example previews removal of the existing shrine;
+never omit `DIRECTOR_DRY_RUN=1`. If it has changed or is occupied, choose another
+unchanged, unoccupied building or an unlocked construction on a compatible free
+plot. Report unavailable smoke if neither exists. A cottage is locked at the fresh
+world's 0 XP; do not grant XP or remove buildings to manufacture a smoke fixture.
+The checksum must match unless an independently observed concurrent Director
+write occurred; in that case isolate writers safely and verify again.
+No blind mutation retries.
 
 Keep credentials, worlds, quest JSON, SQLite files/backups, and logs out of Git.
 The host-only Podman cgroup configuration and private test deployment files are
@@ -125,7 +128,7 @@ world backups, a stable world ID, reviewed empty plots/protected regions,
 compatible installed templates, and a successful server-connected dry-run.
 
 The isolated test deployment at `/home/fuz/mc-director-village-test` is already
-running on `10.1.1.232:25567` with private localhost RCON and DEMO mode. Preserve
+running Java 26.3 on `10.1.1.232:25568` with private localhost RCON and DEMO mode. Preserve
 its world/configuration/quest state/SQLite and reconciliation backups. No restart
 is required merely for this release's Git commit/merge or documentation changes.
 For future Python changes requiring reload, follow `AGENTS.md` lifecycle controls;

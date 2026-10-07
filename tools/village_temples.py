@@ -35,6 +35,14 @@ MATERIALS = {
 }
 ALTAR_BASE = "minecraft:chiseled_stone_bricks"
 ALTAR_TOP = {"id": "minecraft:smooth_stone_slab", "properties": {"type": "top", "waterlogged": "false"}}
+CONTAINER_IDS = {"offering_chest": "minecraft:chest", "ender_chest": "minecraft:ender_chest"}
+CONTAINER_OFFSETS = {"offering_chest": (1, 1, 1), "ender_chest": (3, 1, 1)}
+CONTAINER_STATES = {
+    "offering_chest": {"id": "minecraft:chest",
+                       "properties": {"waterlogged": "false", "facing": "south", "type": "single"}},
+    "ender_chest": {"id": "minecraft:ender_chest",
+                     "properties": {"waterlogged": "false", "facing": "south"}},
+}
 PACK_META = {"pack": {"description": "Keeper temples in every vanilla village — Java 26.3 only",
                        "min_format": [121, 0], "max_format": [121, 0]}}
 PASSABLE = {"minecraft:air", "minecraft:cave_air", "minecraft:structure_void"}
@@ -136,13 +144,34 @@ def validate_root(root, record, *, rotations=range(4)):
         expected[adjustment["index"]]["pos"] = adjustment["to"]
     if sorted(current, key=lambda b: tuple(b["pos"])) != sorted(expected, key=lambda b: tuple(b["pos"])):
         raise ValueError("Lost/changed trusted jigsaw metadata or road position")
+    entries = {tuple(block["pos"]): block for block in root["blocks"]}
     for block in root["blocks"]:
         if any(p < 0 or p >= limit for p, limit in zip(block["pos"], size)):
             raise ValueError("Block outside root bounds")
-        if "nbt" in block and root["palette"][block["state"]]["id"] != "minecraft:jigsaw":
+        block_id = root["palette"][block["state"]]["id"]
+        if "nbt" in block and block_id not in {"minecraft:jigsaw", *CONTAINER_IDS.values()}:
             raise ValueError("Unexpected block entity payload")
+        if block_id in CONTAINER_IDS.values() and "nbt" not in block:
+            raise ValueError("Container is missing block entity payload")
     blocks = block_map(root)
     floor = record["floor_y"]
+    containers = {name: tuple(position) for name, position in record["containers"].items()}
+    expected_container_positions = set(containers.values())
+    seen_container_positions = {position for position, state in blocks.items()
+                                if state["id"] in CONTAINER_IDS.values()}
+    if seen_container_positions != expected_container_positions:
+        raise ValueError("Expected exactly one offering chest and one ender chest")
+    for name, position in containers.items():
+        block = entries.get(position)
+        state = blocks.get(position, {})
+        if state.get("id") != CONTAINER_IDS[name] or block is None:
+            raise ValueError(f"Invalid {name} position or block")
+        payload = block.get("nbt", {})
+        if payload.get("id") != CONTAINER_IDS[name]:
+            raise ValueError(f"Invalid {name} block entity ID")
+        if name == "offering_chest":
+            if "Items" not in payload or len(payload["Items"]) != 0 or "LootTable" in payload:
+                raise ValueError("Offering chest must start empty without a loot table")
     ax, ay, az = record["altar"]["base"]
     if sum(state["id"] == ALTAR_BASE for state in blocks.values()) != 1:
         raise ValueError("Expected exactly one Keeper altar")
@@ -167,9 +196,12 @@ def validate_root(root, record, *, rotations=range(4)):
     for x in range(x0 + 1, x0 + 4):
         for z in range(z0 + 1, z0 + 4):
             for y in range(floor + 1, floor + 4):
+                position = (x, y, z)
                 if (x, z) == (ax, az) and y in (ay, ay + 1):
                     continue
-                if blocks.get((x, y, z), {}).get("id") != "minecraft:air":
+                if position in expected_container_positions:
+                    continue
+                if blocks.get(position, {}).get("id") != "minecraft:air":
                     raise ValueError("Interior requires explicit air clearance")
     for h in (0, 1):
         if blocks.get((entry[0], entry[1] + h, entry[2]), {}).get("id") != "minecraft:air":
@@ -242,6 +274,10 @@ def validate_processors(root, record, processors, tags):
         if original["id"] == "minecraft:jigsaw":
             continue
         candidates = palette_outcomes[block["state"]]
+        if original["id"] in CONTAINER_IDS.values():
+            if any(candidate != original for candidate in candidates):
+                raise ValueError("Processor can change approved container")
+            continue
         if y <= floor or y == floor + 4 and x0 <= x <= x0 + 4 and z0 <= z <= z0 + 4:
             if any(candidate["id"] not in SOLID for candidate in candidates):
                 raise ValueError("Processor can remove floor support or solid roof")
@@ -352,7 +388,20 @@ def author_root(source, recipe):
     altar = [x0 + 2, floor + 1, z0 + 3]
     put(altar, ALTAR_BASE)
     put((altar[0], altar[1] + 1, altar[2]), ALTAR_TOP)
-    occupied = {tuple(b["pos"]) for b in roads}
+    containers = {
+        name: [x0 + offset[0], floor + offset[1], z0 + offset[2]]
+        for name, offset in CONTAINER_OFFSETS.items()
+    }
+    container_positions = {tuple(position) for position in containers.values()}
+    source_joint_positions = {tuple(block["pos"]) for block in source_joints}
+    if source_joint_positions & container_positions:
+        raise ValueError("Vanilla jigsaw collides with an approved container position")
+    for name, position in containers.items():
+        metadata = {"id": CONTAINER_IDS[name]}
+        if name == "offering_chest":
+            metadata["Items"] = nbt.List([], item_tag=10)
+        put(position, CONTAINER_STATES[name], metadata)
+    occupied = {tuple(b["pos"]) for b in roads} | container_positions
     adjustments = []
     final_joints = []
     for index, block in enumerate(source_joints):
@@ -395,6 +444,7 @@ def author_root(source, recipe):
               "roof_y": floor + 4, "entry": entry,
               "altar": {"base": altar, "top": [altar[0], altar[1] + 1, altar[2]],
                         "approach": [altar[0], floor + 1, altar[2] - 1]},
+              "containers": containers,
               "materials": {"wall": "minecraft:" + wall, "roof": "minecraft:" + roof,
                             "floor": "minecraft:smooth_stone"},
               "source_jigsaws": [joint_record(source, b) for b in source_joints],

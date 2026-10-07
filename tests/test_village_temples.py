@@ -215,15 +215,25 @@ class VillageTempleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "altar"):
             temples.validate_processors(root, record, processor, {})
 
-    def test_real_generated_nbt_has_no_entities_or_non_jigsaw_payloads_and_is_stable(self):
+    def test_real_generated_nbt_has_only_approved_container_payloads_and_is_stable(self):
         for resource, root in self.roots.items():
             with self.subTest(resource=resource):
+                record = self.manifest["roots"][resource]
                 self.assertFalse(root["entities"])
+                payloads = []
                 for block in root["blocks"]:
-                    if "nbt" in block:
-                        self.assertEqual(root["palette"][block["state"]]["id"], "minecraft:jigsaw")
-                        self.assertNotIn("Items", block["nbt"])
-                        self.assertNotIn("LootTable", block["nbt"])
+                    if "nbt" not in block:
+                        continue
+                    block_id = root["palette"][block["state"]]["id"]
+                    self.assertIn(block_id, {"minecraft:jigsaw", *temples.CONTAINER_IDS.values()})
+                    if block_id != "minecraft:jigsaw":
+                        payloads.append((tuple(block["pos"]), block_id, block["nbt"]))
+                self.assertEqual({item[0] for item in payloads},
+                                 {tuple(position) for position in record["containers"].values()})
+                self.assertEqual({item[1] for item in payloads}, set(temples.CONTAINER_IDS.values()))
+                offering = next(item for item in payloads if item[1] == "minecraft:chest")
+                self.assertEqual(len(offering[2]["Items"]), 0)
+                self.assertNotIn("LootTable", offering[2])
                 payload = (PACK / temples.resource_path(resource)).read_bytes()
                 self.assertEqual(nbt.dumps(root), payload)
 
