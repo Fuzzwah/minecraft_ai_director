@@ -106,11 +106,11 @@ player detection, log monitoring, and LLM quest generation do not require it.
 
 ## Adaptive temple offerings
 
-The Java 26.3 temple datapack adds two containers to every supported normal and
-abandoned town-center root: one empty normal chest for the communal Keeper
-offering and one ender chest for private player offerings. The Python Director
-never accepts chest coordinates, item IDs, quantities, lanes, scores, or rewards
-from the model. Configure the generated temple's communal chest explicitly:
+The Java 26.3 temple datapack adds one integrated Greek-inspired temple and one
+empty normal offering chest to every supported normal and abandoned town-center
+root. It adds no ender chest. The Python Director never accepts chest
+coordinates, item IDs, quantities, lanes, scores, or rewards from the model.
+Configure the generated temple's offering chest explicitly:
 
 | Variable | Default |
 | --- | --- |
@@ -118,12 +118,14 @@ from the model. Configure the generated temple's communal chest explicitly:
 | `OFFERING_CHEST_X/Y/Z` | unset; communal quests decline until configured |
 | `SPAWN_SUPPLY_RADIUS` | `64` blocks |
 
-A communal quest uses the configured loaded chest and rewards all eligible online
-players at completion. A private quest uses only its target player's ender chest
-and rewards only that target. Offerings are persisted as prepared, uncertain, or
-completed intents; a lost RCON response stops the Director for reconciliation and
-never replays consumption or rewards. Player-inventory and arbitrary-chest
-fallbacks are not supported.
+Both communal and private quests use the configured loaded normal offering
+chest. A communal quest rewards all eligible online players at completion; a
+private quest retains exactly one target player and rewards only that target.
+Offerings are persisted as prepared, uncertain, or completed intents; a lost RCON
+response stops the Director for reconciliation and never replays consumption or
+rewards. Ender-chest, player-inventory, and arbitrary-chest fallbacks are not
+supported. Persisted private quests from the removed ender-chest contract are
+migrated to the shared chest without reading or consuming legacy ender items.
 
 Candidate items are Python-owned. Spawn-local communal items require a complete
 saved Anvil observation of the bounded village area; private local items may also
@@ -139,13 +141,14 @@ to regenerated terrain. The observation and RCON contract targets Java 26.3;
 the settlement construction pack remains a separate Java 1.21–1.21.1 artifact.
 
 Acceptance evidence: the disposable Java 26.3 server loaded the temple pack before
-first generation, generated a natural taiga village with an empty chest and ender
-chest, placed controlled roots in all four rotations, and retained them across a
-save/restart. RCON verified Java 26.3 protocol/data versions and exact container
-NBT. Standard-library Director probes read the real saved village supply and
-consumed a partial pumpkin stack while preserving its slot. Unit tests cover
-communal all-online and private target-only rewards, restart persistence, and
-lost-response uncertainty. A rendered client workflow was not verified: the
+first generation, generated supported village roots with the Greek composition,
+one empty normal chest, and no ender chest, placed controlled roots in all four
+rotations, and retained them across a save/restart. RCON verified Java 26.3
+protocol/data versions and exact container NBT. Standard-library Director probes
+read the real saved village supply and consumed a partial pumpkin stack while
+preserving its slot. Unit tests cover communal all-online and private target-only
+rewards, shared-chest legacy migration, restart persistence, and lost-response
+uncertainty. A rendered client workflow was not verified: the
 cached official client reached Java 26.3 but its authentication token returned
 HTTP 401, so no client joined the offline acceptance server.
 

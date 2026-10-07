@@ -243,7 +243,7 @@ class Quest:
     quest_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     lane: str = "private"
     candidate_band: str = "spawn_local"
-    submission: str = "ender_chest"
+    submission: str = "offering_chest"
     availability: list[str] = field(default_factory=list)
 
 
@@ -358,9 +358,16 @@ def load_state() -> State:
         private_quest_at = {str(player): float(value) for player, value in private_quest_at.items()}
         if not all(math.isfinite(value) for value in (last_quest_at, last_communal_quest_at, *private_quest_at.values())):
             raise ValueError("invalid quest timestamp")
-        return State(active_quest=legacy, communal_quest=communal, private_quests=private,
-                     last_quest_at=last_quest_at, last_communal_quest_at=last_communal_quest_at,
-                     private_quest_at=private_quest_at, pending_settlement_rewards=pending)
+        state = State(active_quest=legacy, communal_quest=communal, private_quests=private,
+                      last_quest_at=last_quest_at, last_communal_quest_at=last_communal_quest_at,
+                      private_quest_at=private_quest_at, pending_settlement_rewards=pending)
+        migrated = (legacy_private_submission(legacy_data)
+                    or legacy_private_submission(communal_data)
+                    or any(legacy_private_submission(raw) for raw in private_data.values())
+                    or any(legacy_private_submission(entry.get("quest")) for entry in pending_data))
+        if migrated:
+            save_state(state)
+        return state
     except Exception as exc:
         print(f"[WARN] Could not load state: {exc}")
         if not SETTLEMENT_ENABLED and not (
@@ -383,6 +390,11 @@ def validate_reward_shape(reward: dict) -> dict:
     raise ValueError("invalid settlement reward")
 
 
+def legacy_private_submission(raw: object) -> bool:
+    return (isinstance(raw, dict) and raw.get("lane", "private") == "private"
+            and raw.get("submission") == "ender_chest")
+
+
 def load_saved_quest(raw: dict) -> Quest:
     if not isinstance(raw, dict):
         raise ValueError("quest must be an object")
@@ -391,6 +403,8 @@ def load_saved_quest(raw: dict) -> Quest:
         # Old quests receive the same ID on every load, even before migration is saved.
         data["quest_id"] = hashlib.sha256(json.dumps(raw, sort_keys=True).encode()).hexdigest()
     quest = Quest(**data)
+    if legacy_private_submission(data):
+        quest.submission = "offering_chest"
     if not isinstance(quest.player, str) or not PLAYER_RE.fullmatch(quest.player):
         raise ValueError("invalid saved quest player")
     if quest.lane not in {"private", "communal", "legacy"}:
@@ -461,10 +475,9 @@ def player_profile(player: str) -> PlayerProfile:
             return response
         levels = parse_first_int(checked(f"experience query {player} levels"))
         inventory = parse_player_items(checked(f"data get entity {player} Inventory"))
-        ender = parse_player_items(checked(f"data get entity {player} EnderItems"))
         equipment = parse_player_items(checked(f"data get entity {player} ArmorItems"))
         equipment.update(parse_player_items(checked(f"data get entity {player} HandItems")))
-        return build_profile(player, levels, inventory, ender, equipment)
+        return build_profile(player, levels, inventory, {}, equipment)
     except (OSError, RconError, ValueError):
         return build_profile(player, 0, {}, {}, {}, confidence="limited")
 
@@ -539,10 +552,8 @@ def source_slots(quest: Quest) -> list[dict]:
         if "Test failed" in block_id or "minecraft:chest" not in block_id or "ender_chest" in block_id:
             raise ValueError("configured offering source is not a loaded normal chest")
         response = rcon(f"data get block {x} {y} {z} Items")
-    elif quest.submission == "ender_chest":
-        response = rcon(f"data get entity {quest.player} EnderItems")
     else:
-        return []
+        raise ValueError("shared offering chest is the only supported quest source")
     return parse_inventory_slots(response)
 
 
@@ -557,8 +568,6 @@ def source_descriptor(quest: Quest) -> tuple[str, str] | None:
             return None
         x, y, z = OFFERING_CHEST
         return f"block {x} {y} {z}", "Items"
-    if quest.submission == "ender_chest" and PLAYER_RE.fullmatch(quest.player):
-        return f"entity {quest.player}", "EnderItems"
     return None
 
 
@@ -844,7 +853,9 @@ def validate_quest(raw: dict, players: list[str], manager=None, offered_rewards=
     player = COMMUNAL_PLAYER if lane == "communal" else str(raw.get("player", ""))
     item = str(raw.get("item", ""))
     title = str(raw.get("title", "A Small Favour"))[:60]
-    announcement = str(raw.get("announcement", "Bring the requested offering to the village temple."))[:220]
+    announcement = str(raw.get("announcement", "Bring the requested offering to the shared temple offering chest."))[:220]
+    if "offering chest" not in announcement.lower():
+        announcement = (announcement.rstrip(".!?") + ". Deposit it in the shared temple offering chest.")[:220]
 
     if lane == "private" and (player not in players or not PLAYER_RE.fullmatch(player)):
         raise ValueError("LLM selected an invalid/offline player")
@@ -872,7 +883,7 @@ def validate_quest(raw: dict, players: list[str], manager=None, offered_rewards=
         raise ValueError("duplicate requested rewards")
     rewards = [reward for reward in allowed_rewards if reward["type"] == "settlement_xp"]
     rewards.extend(reward for reward in requested if reward["type"] == "structure")
-    submission = "offering_chest" if lane == "communal" else "ender_chest"
+    submission = "offering_chest"
     return Quest(player=player, item=item, quantity=quantity, reward_tier=reward_tier,
                  title=title, announcement=announcement, created_at=time.time(), rewards=rewards,
                  lane=lane, candidate_band=candidate["band"], submission=submission,
@@ -895,11 +906,10 @@ def fallback_quest(players: list[str], manager=None, *, lane: str = "private",
     tier = min(3, 1 + BAND_ORDER.index(candidate["band"]) // 2)
     return Quest(player=player, item=item, quantity=quantity, reward_tier=tier,
                  title="Temple Offering", announcement=(
-                     f"{player}, bring {quantity} {pretty_item} to the village temple."),
+                     f"{player}, bring {quantity} {pretty_item} to the shared temple offering chest."),
                  created_at=time.time(), rewards=[reward for reward in configured_rewards(manager, tier)
                  if reward["type"] == "settlement_xp"], lane=lane,
-                 candidate_band=candidate["band"], submission=(
-                     "offering_chest" if lane == "communal" else "ender_chest"),
+                 candidate_band=candidate["band"], submission="offering_chest",
                  availability=list(candidate.get("sources", [])))
 
 
@@ -917,7 +927,8 @@ def make_quest_with_llm(players: list[str], recent_events: list[str], manager=No
                for item, value in candidate_map.items()}
     system = (
         "You are The Keeper, a playful Minecraft game master on a private family server. "
-        "Create ONE concise collect-and-return quest. The player submits to the specified lane. "
+        "Create ONE concise collect-and-return quest. Every lane submits to the shared normal temple offering chest; "
+        "private quests reward only their named target player. "
         "Do not invent commands, items, players, coordinates, or rewards. Return JSON only with "
         "keys: player, item, quantity, reward_tier, title, announcement."
     )

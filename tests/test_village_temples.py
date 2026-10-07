@@ -114,6 +114,19 @@ class VillageTempleTests(unittest.TestCase):
                             directions = ("north", "east", "south", "west")
                             self.assertEqual(rotated.split("_")[0], directions[(directions.index(facing) + rotation) % 4])
 
+    def test_greek_identity_uses_style_palette_and_single_offering_source(self):
+        for resource, root in self.roots.items():
+            record = self.manifest["roots"][resource]
+            with self.subTest(resource=resource):
+                result = temples.validate_root(root, record)
+                self.assertGreaterEqual(result["columns"], 6)
+                self.assertGreaterEqual(result["pediment"], 4)
+                self.assertGreater(result["foundation"], 0)
+                self.assertEqual(set(record["containers"]), {"offering_chest"})
+                self.assertNotIn("minecraft:ender_chest", {state["id"] for state in root["palette"]})
+                self.assertEqual(record["materials"]["column"], "minecraft:" + temples.MATERIALS[record["style"]]["column"])
+                self.assertEqual(record["materials"]["roof"], "minecraft:" + temples.MATERIALS[record["style"]]["roof"])
+
     def test_abandoned_processors_cannot_change_altar_roof_floor_or_clearance(self):
         for resource, root in self.roots.items():
             record = self.manifest["roots"][resource]
@@ -168,7 +181,7 @@ class VillageTempleTests(unittest.TestCase):
         root, record = self.first()
         x, z = record["room_min"]
         cases = [("roof", [x, record["roof_y"], z], "Incomplete solid roof"),
-                 ("wall", [x, record["floor_y"] + 1, z], "biome-appropriate temple shell"),
+                 ("wall", [x, record["floor_y"] + 2, z], "Greek temple shell"),
                  ("floor", [x + 1, record["floor_y"], z + 1], "Unsupported temple floor"),
                  ("altar", record["altar"]["base"], "exactly one Keeper altar"),
                  ("interior", record["altar"]["approach"], "explicit air clearance")]
@@ -230,7 +243,8 @@ class VillageTempleTests(unittest.TestCase):
                         payloads.append((tuple(block["pos"]), block_id, block["nbt"]))
                 self.assertEqual({item[0] for item in payloads},
                                  {tuple(position) for position in record["containers"].values()})
-                self.assertEqual({item[1] for item in payloads}, set(temples.CONTAINER_IDS.values()))
+                self.assertEqual({item[1] for item in payloads}, {"minecraft:chest"})
+                self.assertNotIn("minecraft:ender_chest", {state["id"] for state in root["palette"]})
                 offering = next(item for item in payloads if item[1] == "minecraft:chest")
                 self.assertEqual(len(offering[2]["Items"]), 0)
                 self.assertNotIn("LootTable", offering[2])
