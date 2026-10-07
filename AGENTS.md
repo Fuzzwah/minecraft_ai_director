@@ -117,6 +117,31 @@ idle-pause threshold. These checks do **not** prove visual client rendering or
 authenticated player quest completion; those require a Minecraft client.
 Update `README.md` when the operating contract changes.
 
+## Current designated deployment
+
+The current player-facing Java 26.3 deployment is **`10.1.1.232:25555`**:
+`mc_ai_director_default.service` and `mc_ai_director_default_keeper.service`,
+with source mounted read-only from primary `main` at
+`/home/fuz/code/minecraft_ai_director`. Ship through the reviewed topic-branch PR
+workflow before synchronizing that checkout; never mount an implementation
+worktree into the live Director.
+
+Stop the Director writer first, flush the world, then stop Minecraft before
+capturing complete paired `mc_ai_director_default_data` and
+`mc_ai_director_default_state` rollback archives. Keep private archive permissions
+and checksums in a manifest under `/home/fuz/mc-ai-director-backups/`; retain
+existing reconciliation snapshots. Preserve current configuration, quest JSON,
+any SQLite state, world-generation identity, village hub, and chest coordinates.
+This quest-policy upgrade does not regenerate terrain or reset progression.
+
+The Minecraft service **Wants the Keeper service**, and the Keeper is bound to
+and part of Minecraft. Starting Minecraft can therefore start the Director too.
+Inspect actual activation; explicitly stop the Keeper again before a
+writer-stopped read-only preview, then restore the single writer afterward.
+For mounted-world previews, reuse the live container's user-namespace identity;
+do not change volume ownership to bypass permissions. No candidate below its
+verified catalog-minimum yield is a valid opening quest; deferral is intentional.
+
 ## Isolated test server on this host
 
 Run rootless Podman as **`fuz`**, not `sudo podman` (root has a different container
