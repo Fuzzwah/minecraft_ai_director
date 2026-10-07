@@ -9,7 +9,7 @@
       121,
       0
     ],
-    "recipes_sha256": "6929a544fb7b592bbdd3f256c56d7e9bc0d05b49ef0695cd07ec9c18b0bf7526",
+    "recipes_sha256": "0cdd567ea487f20ce8b76cd4503614e560d018a32a9e8bafa2ca89ee0d660d3d",
     "server_image": "docker.io/itzg/minecraft-server@sha256:783d2712019a3996b4168752517a08d3448ef8995879b200316c3888f98dc394"
   },
   "source_pools": {
@@ -365,7 +365,7 @@
       ],
       "size": [
         9,
-        5,
+        7,
         9
       ],
       "floor_y": 0,
@@ -404,17 +404,138 @@
         "offering_chest": [
           3,
           1,
-          3
-        ],
-        "ender_chest": [
-          5,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            2
+          ],
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -894,17 +1015,138 @@
         "offering_chest": [
           3,
           1,
-          3
-        ],
-        "ender_chest": [
-          5,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            2
+          ],
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -1386,7 +1628,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 5,
@@ -1400,7 +1642,7 @@
             0,
             2
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 6,
@@ -1414,7 +1656,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 9,
@@ -1428,7 +1670,7 @@
             0,
             7
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "3e94b0c4e8ff6c3cc331c3b1f98101c8d538e2dbf677cb3791087bca195882df",
@@ -1444,7 +1686,7 @@
       ],
       "size": [
         8,
-        5,
+        7,
         15
       ],
       "floor_y": 0,
@@ -1483,17 +1725,138 @@
         "offering_chest": [
           2,
           1,
-          6
-        ],
-        "ender_chest": [
-          4,
-          1,
-          6
+          7
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            1,
+            1,
+            5
+          ],
+          [
+            1,
+            1,
+            6
+          ],
+          [
+            1,
+            1,
+            7
+          ],
+          [
+            1,
+            1,
+            8
+          ],
+          [
+            1,
+            1,
+            9
+          ],
+          [
+            2,
+            1,
+            9
+          ],
+          [
+            3,
+            1,
+            9
+          ],
+          [
+            4,
+            1,
+            9
+          ],
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            8
+          ],
+          [
+            5,
+            1,
+            9
+          ]
+        ],
+        "columns": [
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            2,
+            5
+          ],
+          [
+            2,
+            3,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            4,
+            2,
+            5
+          ],
+          [
+            4,
+            3,
+            5
+          ]
+        ],
+        "pediment": [
+          [
+            2,
+            5,
+            5
+          ],
+          [
+            3,
+            5,
+            5
+          ],
+          [
+            3,
+            6,
+            5
+          ],
+          [
+            4,
+            5,
+            5
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -1975,7 +2338,7 @@
             0,
             6
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 3,
@@ -1989,7 +2352,7 @@
             0,
             8
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 5,
@@ -2003,7 +2366,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "a2a99fc18bcd10a15c24ffe421c589754ead8812231779adb514f65ffcb104e3",
@@ -2060,17 +2423,138 @@
         "offering_chest": [
           4,
           1,
-          4
-        ],
-        "ender_chest": [
-          6,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            2,
+            3
+          ],
+          [
+            4,
+            3,
+            3
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -2426,7 +2910,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "926aebcb850ac01926a22040086218269025b113f090613e6e63dd0a04799160",
@@ -2442,7 +2926,7 @@
       ],
       "size": [
         9,
-        6,
+        7,
         9
       ],
       "floor_y": 0,
@@ -2481,17 +2965,138 @@
         "offering_chest": [
           3,
           1,
-          3
-        ],
-        "ender_chest": [
-          5,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            2
+          ],
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -2803,17 +3408,138 @@
         "offering_chest": [
           3,
           1,
-          3
-        ],
-        "ender_chest": [
-          5,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            2
+          ],
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -3169,7 +3895,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 2,
@@ -3183,7 +3909,7 @@
             0,
             2
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 3,
@@ -3197,7 +3923,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 6,
@@ -3211,7 +3937,7 @@
             0,
             7
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "e6367e7f1f147af2affe17d2035c87123ad2ab893f00e1227fdb4a460de18ca3",
@@ -3227,7 +3953,7 @@
       ],
       "size": [
         8,
-        5,
+        7,
         15
       ],
       "floor_y": 0,
@@ -3266,17 +3992,138 @@
         "offering_chest": [
           2,
           1,
-          6
-        ],
-        "ender_chest": [
-          4,
-          1,
-          6
+          7
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            1,
+            1,
+            5
+          ],
+          [
+            1,
+            1,
+            6
+          ],
+          [
+            1,
+            1,
+            7
+          ],
+          [
+            1,
+            1,
+            8
+          ],
+          [
+            1,
+            1,
+            9
+          ],
+          [
+            2,
+            1,
+            9
+          ],
+          [
+            3,
+            1,
+            9
+          ],
+          [
+            4,
+            1,
+            9
+          ],
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            8
+          ],
+          [
+            5,
+            1,
+            9
+          ]
+        ],
+        "columns": [
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            2,
+            5
+          ],
+          [
+            2,
+            3,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            4,
+            2,
+            5
+          ],
+          [
+            4,
+            3,
+            5
+          ]
+        ],
+        "pediment": [
+          [
+            2,
+            5,
+            5
+          ],
+          [
+            3,
+            5,
+            5
+          ],
+          [
+            3,
+            6,
+            5
+          ],
+          [
+            4,
+            5,
+            5
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -3548,7 +4395,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 1,
@@ -3562,7 +4409,7 @@
             0,
             10
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "33863045710e20a422209acd6016f6e806b33d093f1c83c6d1d2595d88c7adbc",
@@ -3617,17 +4464,138 @@
         "offering_chest": [
           4,
           1,
-          4
-        ],
-        "ender_chest": [
-          6,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            2,
+            3
+          ],
+          [
+            4,
+            3,
+            3
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_oak_log",
+        "column": "minecraft:stripped_oak_wood",
+        "wall": "minecraft:stripped_oak_wood",
         "roof": "minecraft:stripped_oak_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -3857,7 +4825,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "54232e207171e362d35a6ddc08aa9f648e8bdc6a331532e3ce7ac28b65c1572e",
@@ -3873,7 +4841,7 @@
       ],
       "size": [
         17,
-        6,
+        7,
         9
       ],
       "floor_y": 0,
@@ -3912,17 +4880,138 @@
         "offering_chest": [
           11,
           1,
-          3
-        ],
-        "ender_chest": [
-          13,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            10,
+            1,
+            2
+          ],
+          [
+            10,
+            1,
+            3
+          ],
+          [
+            10,
+            1,
+            4
+          ],
+          [
+            10,
+            1,
+            5
+          ],
+          [
+            10,
+            1,
+            6
+          ],
+          [
+            11,
+            1,
+            6
+          ],
+          [
+            12,
+            1,
+            6
+          ],
+          [
+            13,
+            1,
+            6
+          ],
+          [
+            14,
+            1,
+            2
+          ],
+          [
+            14,
+            1,
+            3
+          ],
+          [
+            14,
+            1,
+            4
+          ],
+          [
+            14,
+            1,
+            5
+          ],
+          [
+            14,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            11,
+            1,
+            2
+          ],
+          [
+            11,
+            2,
+            2
+          ],
+          [
+            11,
+            3,
+            2
+          ],
+          [
+            13,
+            1,
+            2
+          ],
+          [
+            13,
+            2,
+            2
+          ],
+          [
+            13,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            11,
+            5,
+            2
+          ],
+          [
+            12,
+            5,
+            2
+          ],
+          [
+            12,
+            6,
+            2
+          ],
+          [
+            13,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
+        "column": "minecraft:sandstone",
         "wall": "minecraft:sandstone",
         "roof": "minecraft:sandstone",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -4533,7 +5622,7 @@
       ],
       "size": [
         12,
-        6,
+        7,
         12
       ],
       "floor_y": 0,
@@ -4572,17 +5661,138 @@
         "offering_chest": [
           4,
           1,
-          4
-        ],
-        "ender_chest": [
-          6,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            2,
+            3
+          ],
+          [
+            4,
+            3,
+            3
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
+        "column": "minecraft:sandstone",
         "wall": "minecraft:sandstone",
         "roof": "minecraft:sandstone",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -5067,7 +6277,7 @@
       ],
       "size": [
         15,
-        6,
+        7,
         15
       ],
       "floor_y": 0,
@@ -5106,17 +6316,138 @@
         "offering_chest": [
           6,
           1,
-          6
-        ],
-        "ender_chest": [
-          8,
-          1,
-          6
+          7
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            8
+          ],
+          [
+            5,
+            1,
+            9
+          ],
+          [
+            6,
+            1,
+            9
+          ],
+          [
+            7,
+            1,
+            9
+          ],
+          [
+            8,
+            1,
+            9
+          ],
+          [
+            9,
+            1,
+            5
+          ],
+          [
+            9,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            7
+          ],
+          [
+            9,
+            1,
+            8
+          ],
+          [
+            9,
+            1,
+            9
+          ]
+        ],
+        "columns": [
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            2,
+            5
+          ],
+          [
+            6,
+            3,
+            5
+          ],
+          [
+            8,
+            1,
+            5
+          ],
+          [
+            8,
+            2,
+            5
+          ],
+          [
+            8,
+            3,
+            5
+          ]
+        ],
+        "pediment": [
+          [
+            6,
+            5,
+            5
+          ],
+          [
+            7,
+            5,
+            5
+          ],
+          [
+            7,
+            6,
+            5
+          ],
+          [
+            8,
+            5,
+            5
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
+        "column": "minecraft:sandstone",
         "wall": "minecraft:sandstone",
         "roof": "minecraft:sandstone",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -5682,7 +7013,7 @@
             0,
             10
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 6,
@@ -5696,7 +7027,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 10,
@@ -5710,7 +7041,7 @@
             1,
             10
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "2a9b4f5003cf4fd035bb7b25dbbe68ba2bb09b97f60f88b8fec204be5207d2e3",
@@ -5728,7 +7059,7 @@
       ],
       "size": [
         17,
-        6,
+        7,
         9
       ],
       "floor_y": 0,
@@ -5767,17 +7098,138 @@
         "offering_chest": [
           11,
           1,
-          3
-        ],
-        "ender_chest": [
-          13,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            10,
+            1,
+            2
+          ],
+          [
+            10,
+            1,
+            3
+          ],
+          [
+            10,
+            1,
+            4
+          ],
+          [
+            10,
+            1,
+            5
+          ],
+          [
+            10,
+            1,
+            6
+          ],
+          [
+            11,
+            1,
+            6
+          ],
+          [
+            12,
+            1,
+            6
+          ],
+          [
+            13,
+            1,
+            6
+          ],
+          [
+            14,
+            1,
+            2
+          ],
+          [
+            14,
+            1,
+            3
+          ],
+          [
+            14,
+            1,
+            4
+          ],
+          [
+            14,
+            1,
+            5
+          ],
+          [
+            14,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            11,
+            1,
+            2
+          ],
+          [
+            11,
+            2,
+            2
+          ],
+          [
+            11,
+            3,
+            2
+          ],
+          [
+            13,
+            1,
+            2
+          ],
+          [
+            13,
+            2,
+            2
+          ],
+          [
+            13,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            11,
+            5,
+            2
+          ],
+          [
+            12,
+            5,
+            2
+          ],
+          [
+            12,
+            6,
+            2
+          ],
+          [
+            13,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
+        "column": "minecraft:sandstone",
         "wall": "minecraft:sandstone",
         "roof": "minecraft:sandstone",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -6176,7 +7628,7 @@
       ],
       "size": [
         12,
-        6,
+        7,
         12
       ],
       "floor_y": 0,
@@ -6215,17 +7667,138 @@
         "offering_chest": [
           4,
           1,
-          4
-        ],
-        "ender_chest": [
-          6,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            2,
+            3
+          ],
+          [
+            4,
+            3,
+            3
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
+        "column": "minecraft:sandstone",
         "wall": "minecraft:sandstone",
         "roof": "minecraft:sandstone",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -6498,7 +8071,7 @@
       ],
       "size": [
         15,
-        6,
+        7,
         15
       ],
       "floor_y": 0,
@@ -6537,17 +8110,138 @@
         "offering_chest": [
           6,
           1,
-          6
-        ],
-        "ender_chest": [
-          8,
-          1,
-          6
+          7
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            8
+          ],
+          [
+            5,
+            1,
+            9
+          ],
+          [
+            6,
+            1,
+            9
+          ],
+          [
+            7,
+            1,
+            9
+          ],
+          [
+            8,
+            1,
+            9
+          ],
+          [
+            9,
+            1,
+            5
+          ],
+          [
+            9,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            7
+          ],
+          [
+            9,
+            1,
+            8
+          ],
+          [
+            9,
+            1,
+            9
+          ]
+        ],
+        "columns": [
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            2,
+            5
+          ],
+          [
+            6,
+            3,
+            5
+          ],
+          [
+            8,
+            1,
+            5
+          ],
+          [
+            8,
+            2,
+            5
+          ],
+          [
+            8,
+            3,
+            5
+          ]
+        ],
+        "pediment": [
+          [
+            6,
+            5,
+            5
+          ],
+          [
+            7,
+            5,
+            5
+          ],
+          [
+            7,
+            6,
+            5
+          ],
+          [
+            8,
+            5,
+            5
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
+        "column": "minecraft:sandstone",
         "wall": "minecraft:sandstone",
         "roof": "minecraft:sandstone",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -6903,7 +8597,7 @@
             1,
             10
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "afa1b7cd3587d27dfc5a37c7ab5d9aea6b9f14ef96a1e497b5773d75de2198e1",
@@ -6919,7 +8613,7 @@
       ],
       "size": [
         14,
-        5,
+        7,
         12
       ],
       "floor_y": 0,
@@ -6958,17 +8652,138 @@
         "offering_chest": [
           5,
           1,
-          4
-        ],
-        "ender_chest": [
-          7,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            1,
+            4
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            7
+          ],
+          [
+            8,
+            1,
+            3
+          ],
+          [
+            8,
+            1,
+            4
+          ],
+          [
+            8,
+            1,
+            5
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            8,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            5,
+            1,
+            3
+          ],
+          [
+            5,
+            2,
+            3
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            2,
+            3
+          ],
+          [
+            7,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -7408,7 +9223,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 3,
@@ -7422,7 +9237,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 4,
@@ -7436,7 +9251,7 @@
             0,
             6
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "9971867cf53657392d6bdc6c4cba1d5e05f3cf74eb467b931b0130021420dc1e",
@@ -7454,7 +9269,7 @@
       ],
       "size": [
         11,
-        6,
+        7,
         11
       ],
       "floor_y": 0,
@@ -7493,17 +9308,138 @@
         "offering_chest": [
           4,
           1,
-          4
-        ],
-        "ender_chest": [
-          6,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            2,
+            3
+          ],
+          [
+            4,
+            3,
+            3
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -7946,7 +9882,7 @@
       ],
       "size": [
         9,
-        6,
+        7,
         11
       ],
       "floor_y": 0,
@@ -7985,17 +9921,138 @@
         "offering_chest": [
           3,
           1,
-          4
-        ],
-        "ender_chest": [
-          5,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            2,
+            1,
+            7
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            3,
+            3,
+            3
+          ],
+          [
+            5,
+            1,
+            3
+          ],
+          [
+            5,
+            2,
+            3
+          ],
+          [
+            5,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            3
+          ],
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            4,
+            6,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -8435,7 +10492,7 @@
             0,
             5
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "6ac1ec613bf4236d8799875b740c386dfe2d456a49f0a29c7e198d1b23b149a6",
@@ -8453,7 +10510,7 @@
       ],
       "size": [
         9,
-        6,
+        7,
         9
       ],
       "floor_y": 0,
@@ -8492,17 +10549,138 @@
         "offering_chest": [
           3,
           1,
-          3
-        ],
-        "ender_chest": [
-          5,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            2
+          ],
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -8903,7 +11081,7 @@
       ],
       "size": [
         14,
-        6,
+        7,
         12
       ],
       "floor_y": 0,
@@ -8942,17 +11120,138 @@
         "offering_chest": [
           5,
           1,
-          4
-        ],
-        "ender_chest": [
-          7,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            1,
+            4
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            7
+          ],
+          [
+            8,
+            1,
+            3
+          ],
+          [
+            8,
+            1,
+            4
+          ],
+          [
+            8,
+            1,
+            5
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            8,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            5,
+            1,
+            3
+          ],
+          [
+            5,
+            2,
+            3
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            2,
+            3
+          ],
+          [
+            7,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -9099,7 +11398,7 @@
       ],
       "size": [
         11,
-        6,
+        7,
         11
       ],
       "floor_y": 0,
@@ -9138,17 +11437,138 @@
         "offering_chest": [
           4,
           1,
-          4
-        ],
-        "ender_chest": [
-          6,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            7
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            3
+          ],
+          [
+            4,
+            2,
+            3
+          ],
+          [
+            4,
+            3,
+            3
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -9421,7 +11841,7 @@
       ],
       "size": [
         9,
-        6,
+        7,
         11
       ],
       "floor_y": 0,
@@ -9460,17 +11880,138 @@
         "offering_chest": [
           3,
           1,
-          4
-        ],
-        "ender_chest": [
-          5,
-          1,
-          4
+          5
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            2,
+            1,
+            7
+          ],
+          [
+            3,
+            1,
+            7
+          ],
+          [
+            4,
+            1,
+            7
+          ],
+          [
+            5,
+            1,
+            7
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            7
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            3,
+            3,
+            3
+          ],
+          [
+            5,
+            1,
+            3
+          ],
+          [
+            5,
+            2,
+            3
+          ],
+          [
+            5,
+            3,
+            3
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            3
+          ],
+          [
+            4,
+            5,
+            3
+          ],
+          [
+            4,
+            6,
+            3
+          ],
+          [
+            5,
+            5,
+            3
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -9785,7 +12326,7 @@
       ],
       "size": [
         9,
-        6,
+        7,
         9
       ],
       "floor_y": 0,
@@ -9824,17 +12365,138 @@
         "offering_chest": [
           3,
           1,
-          3
-        ],
-        "ender_chest": [
-          5,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            6
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            2
+          ],
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_acacia_log",
+        "column": "minecraft:stripped_acacia_log",
+        "wall": "minecraft:stripped_acacia_wood",
         "roof": "minecraft:stripped_acacia_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -10146,17 +12808,138 @@
         "offering_chest": [
           4,
           1,
-          2
-        ],
-        "ender_chest": [
-          6,
-          1,
-          2
+          3
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            1
+          ],
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            7,
+            1,
+            2
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            4,
+            3,
+            1
+          ],
+          [
+            6,
+            1,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            6,
+            3,
+            1
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            1
+          ],
+          [
+            5,
+            5,
+            1
+          ],
+          [
+            5,
+            6,
+            1
+          ],
+          [
+            6,
+            5,
+            1
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:snow_block",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -10680,7 +13463,7 @@
             0,
             0
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "390c3e9c0214137bb18865a491b7f09a789f30bac4d5ff1aefa86dfef8c45d72",
@@ -10698,7 +13481,7 @@
       ],
       "size": [
         11,
-        5,
+        7,
         9
       ],
       "floor_y": 0,
@@ -10737,17 +13520,138 @@
         "offering_chest": [
           4,
           1,
-          3
-        ],
-        "ender_chest": [
-          6,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            2
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            2
+          ],
+          [
+            4,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            2
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            2,
+            2
+          ],
+          [
+            6,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            6,
+            2
+          ],
+          [
+            6,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:snow_block",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -11187,17 +14091,138 @@
         "offering_chest": [
           2,
           1,
-          2
-        ],
-        "ender_chest": [
-          4,
-          1,
-          2
+          3
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            2
+          ],
+          [
+            1,
+            1,
+            3
+          ],
+          [
+            1,
+            1,
+            4
+          ],
+          [
+            1,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            1
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            1,
+            3
+          ],
+          [
+            5,
+            1,
+            4
+          ],
+          [
+            5,
+            1,
+            5
+          ]
+        ],
+        "columns": [
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            2,
+            3,
+            1
+          ],
+          [
+            4,
+            1,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            4,
+            3,
+            1
+          ]
+        ],
+        "pediment": [
+          [
+            2,
+            5,
+            1
+          ],
+          [
+            3,
+            5,
+            1
+          ],
+          [
+            3,
+            6,
+            1
+          ],
+          [
+            4,
+            5,
+            1
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:snow_block",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -11595,7 +14620,7 @@
             0,
             0
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 3,
@@ -11609,7 +14634,7 @@
             0,
             5
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "f95e3225ce3de95c1ad54d3bbae55b4930e62fbcb85402d90d4fb402623b31b5",
@@ -11666,17 +14691,138 @@
         "offering_chest": [
           4,
           1,
-          2
-        ],
-        "ender_chest": [
-          6,
-          1,
-          2
+          3
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            1
+          ],
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            7,
+            1,
+            2
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            4,
+            3,
+            1
+          ],
+          [
+            6,
+            1,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            6,
+            3,
+            1
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            1
+          ],
+          [
+            5,
+            5,
+            1
+          ],
+          [
+            5,
+            6,
+            1
+          ],
+          [
+            6,
+            5,
+            1
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:snow_block",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -12074,7 +15220,7 @@
             0,
             0
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "ae1ae8e3ec16a2096a96ad68cef0212c827a62c44fb9aca5679ed1b1e65a7888",
@@ -12092,7 +15238,7 @@
       ],
       "size": [
         11,
-        6,
+        7,
         9
       ],
       "floor_y": 0,
@@ -12131,17 +15277,138 @@
         "offering_chest": [
           4,
           1,
-          3
-        ],
-        "ender_chest": [
-          6,
-          1,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            1,
+            3
+          ],
+          [
+            3,
+            1,
+            4
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            6
+          ],
+          [
+            4,
+            1,
+            6
+          ],
+          [
+            5,
+            1,
+            6
+          ],
+          [
+            6,
+            1,
+            6
+          ],
+          [
+            7,
+            1,
+            2
+          ],
+          [
+            7,
+            1,
+            3
+          ],
+          [
+            7,
+            1,
+            4
+          ],
+          [
+            7,
+            1,
+            5
+          ],
+          [
+            7,
+            1,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            4,
+            1,
+            2
+          ],
+          [
+            4,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            2
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            2,
+            2
+          ],
+          [
+            6,
+            3,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            4,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            6,
+            2
+          ],
+          [
+            6,
+            5,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:snow_block",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -12455,17 +15722,138 @@
         "offering_chest": [
           2,
           1,
-          2
-        ],
-        "ender_chest": [
-          4,
-          1,
-          2
+          3
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            2
+          ],
+          [
+            1,
+            1,
+            3
+          ],
+          [
+            1,
+            1,
+            4
+          ],
+          [
+            1,
+            1,
+            5
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            1
+          ],
+          [
+            5,
+            1,
+            2
+          ],
+          [
+            5,
+            1,
+            3
+          ],
+          [
+            5,
+            1,
+            4
+          ],
+          [
+            5,
+            1,
+            5
+          ]
+        ],
+        "columns": [
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            2,
+            3,
+            1
+          ],
+          [
+            4,
+            1,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            4,
+            3,
+            1
+          ]
+        ],
+        "pediment": [
+          [
+            2,
+            5,
+            1
+          ],
+          [
+            3,
+            5,
+            1
+          ],
+          [
+            3,
+            6,
+            1
+          ],
+          [
+            4,
+            5,
+            1
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:snow_block",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -12740,7 +16128,7 @@
       ],
       "size": [
         22,
-        5,
+        7,
         18
       ],
       "floor_y": 0,
@@ -12779,17 +16167,138 @@
         "offering_chest": [
           3,
           1,
-          2
-        ],
-        "ender_chest": [
-          5,
-          1,
-          2
+          3
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            1
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            3,
+            3,
+            1
+          ],
+          [
+            5,
+            1,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            1
+          ],
+          [
+            4,
+            5,
+            1
+          ],
+          [
+            4,
+            6,
+            1
+          ],
+          [
+            5,
+            5,
+            1
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:stripped_spruce_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -13565,7 +17074,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 1,
@@ -13579,7 +17088,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 2,
@@ -13593,7 +17102,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 3,
@@ -13607,7 +17116,7 @@
             0,
             4
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "71ebba43c3a22ac54da3af44457dfa169c56b0f3b444e0d20fc8fb515dd29429",
@@ -13623,7 +17132,7 @@
       ],
       "size": [
         9,
-        7,
+        8,
         9
       ],
       "floor_y": 1,
@@ -13662,17 +17171,138 @@
         "offering_chest": [
           3,
           2,
-          3
-        ],
-        "ender_chest": [
-          5,
-          2,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            2,
+            2,
+            3
+          ],
+          [
+            2,
+            2,
+            4
+          ],
+          [
+            2,
+            2,
+            5
+          ],
+          [
+            2,
+            2,
+            6
+          ],
+          [
+            3,
+            2,
+            6
+          ],
+          [
+            4,
+            2,
+            6
+          ],
+          [
+            5,
+            2,
+            6
+          ],
+          [
+            6,
+            2,
+            2
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            2,
+            4
+          ],
+          [
+            6,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            3,
+            4,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            4,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            6,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            4,
+            7,
+            2
+          ],
+          [
+            5,
+            6,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:stripped_spruce_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -14197,7 +17827,7 @@
       ],
       "size": [
         22,
-        6,
+        7,
         18
       ],
       "floor_y": 0,
@@ -14236,17 +17866,138 @@
         "offering_chest": [
           3,
           1,
-          2
-        ],
-        "ender_chest": [
-          5,
-          1,
-          2
+          3
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            1,
+            3
+          ],
+          [
+            2,
+            1,
+            4
+          ],
+          [
+            2,
+            1,
+            5
+          ],
+          [
+            3,
+            1,
+            5
+          ],
+          [
+            4,
+            1,
+            5
+          ],
+          [
+            5,
+            1,
+            5
+          ],
+          [
+            6,
+            1,
+            1
+          ],
+          [
+            6,
+            1,
+            2
+          ],
+          [
+            6,
+            1,
+            3
+          ],
+          [
+            6,
+            1,
+            4
+          ],
+          [
+            6,
+            1,
+            5
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            1,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            3,
+            3,
+            1
+          ],
+          [
+            5,
+            1,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            5,
+            1
+          ],
+          [
+            4,
+            5,
+            1
+          ],
+          [
+            4,
+            6,
+            1
+          ],
+          [
+            5,
+            5,
+            1
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:stripped_spruce_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [
@@ -14854,7 +18605,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         },
         {
           "index": 1,
@@ -14868,7 +18619,7 @@
             0,
             3
           ],
-          "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"
+          "reason": "Keep Greek temple, entry, and final state on supported open plaza"
         }
       ],
       "source_sha256": "141f36d63e6d5fa222434862535bdcf2e86138eaee0dbfa9721b1ff1d1fa87f7",
@@ -14884,7 +18635,7 @@
       ],
       "size": [
         9,
-        7,
+        8,
         9
       ],
       "floor_y": 1,
@@ -14923,17 +18674,138 @@
         "offering_chest": [
           3,
           2,
-          3
-        ],
-        "ender_chest": [
-          5,
-          2,
-          3
+          4
         ]
       },
+      "greek": {
+        "foundation": [
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            2,
+            2,
+            3
+          ],
+          [
+            2,
+            2,
+            4
+          ],
+          [
+            2,
+            2,
+            5
+          ],
+          [
+            2,
+            2,
+            6
+          ],
+          [
+            3,
+            2,
+            6
+          ],
+          [
+            4,
+            2,
+            6
+          ],
+          [
+            5,
+            2,
+            6
+          ],
+          [
+            6,
+            2,
+            2
+          ],
+          [
+            6,
+            2,
+            3
+          ],
+          [
+            6,
+            2,
+            4
+          ],
+          [
+            6,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ]
+        ],
+        "columns": [
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            3,
+            3,
+            2
+          ],
+          [
+            3,
+            4,
+            2
+          ],
+          [
+            5,
+            2,
+            2
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            4,
+            2
+          ]
+        ],
+        "pediment": [
+          [
+            3,
+            6,
+            2
+          ],
+          [
+            4,
+            6,
+            2
+          ],
+          [
+            4,
+            7,
+            2
+          ],
+          [
+            5,
+            6,
+            2
+          ]
+        ],
+        "approach_steps": []
+      },
       "materials": {
-        "wall": "minecraft:stripped_spruce_log",
+        "column": "minecraft:stripped_spruce_log",
+        "wall": "minecraft:stripped_spruce_wood",
         "roof": "minecraft:stripped_spruce_wood",
+        "foundation": "minecraft:smooth_stone",
         "floor": "minecraft:smooth_stone"
       },
       "source_jigsaws": [

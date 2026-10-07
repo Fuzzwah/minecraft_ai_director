@@ -3,9 +3,11 @@
 python3 -B tools/village_temples.py --archive /path/to/server-26.3.jar
 python3 -B tools/village_temples.py --check
 
-The recipes deliberately replace each decorative centerpiece with a 5x5 room
-and an open supported plaza, retaining the vanilla root anchor and all jigsaws.
-This is development tooling, never a running-world mutation mechanism.
+The recipes deliberately replace each decorative centerpiece with a compact
+Greek-inspired temple, retaining the vanilla root anchor and all jigsaws. The
+composition is generated per trusted root so the smallest vanilla footprints
+still receive the same structural identity. This is development tooling, never
+a running-world mutation mechanism.
 """
 
 import argparse
@@ -27,30 +29,29 @@ RECIPES = Path(__file__).with_name("village_temple_recipes.json")
 ARCHIVE_SHA256 = "a362163eec5d1612d520772bc16e5b39c09e3b234fdc045f56bf544284ee8ae6"
 STYLES = ("plains", "desert", "savanna", "snowy", "taiga")
 MATERIALS = {
-    "plains": ("stripped_oak_log", "stripped_oak_wood"),
-    "desert": ("sandstone", "sandstone"),
-    "savanna": ("stripped_acacia_log", "stripped_acacia_wood"),
-    "snowy": ("stripped_spruce_log", "snow_block"),
-    "taiga": ("stripped_spruce_log", "stripped_spruce_wood"),
+    "plains": {"column": "stripped_oak_wood", "wall": "stripped_oak_wood", "roof": "stripped_oak_wood"},
+    "desert": {"column": "sandstone", "wall": "sandstone", "roof": "sandstone"},
+    "savanna": {"column": "stripped_acacia_log", "wall": "stripped_acacia_wood", "roof": "stripped_acacia_wood"},
+    "snowy": {"column": "stripped_spruce_log", "wall": "stripped_spruce_wood", "roof": "snow_block"},
+    "taiga": {"column": "stripped_spruce_log", "wall": "stripped_spruce_wood", "roof": "stripped_spruce_wood"},
 }
+FOUNDATION = "minecraft:smooth_stone"
 ALTAR_BASE = "minecraft:chiseled_stone_bricks"
 ALTAR_TOP = {"id": "minecraft:smooth_stone_slab", "properties": {"type": "top", "waterlogged": "false"}}
-CONTAINER_IDS = {"offering_chest": "minecraft:chest", "ender_chest": "minecraft:ender_chest"}
-CONTAINER_OFFSETS = {"offering_chest": (1, 1, 1), "ender_chest": (3, 1, 1)}
+CONTAINER_IDS = {"offering_chest": "minecraft:chest"}
+CONTAINER_OFFSETS = {"offering_chest": (1, 1, 2)}
 CONTAINER_STATES = {
     "offering_chest": {"id": "minecraft:chest",
                        "properties": {"waterlogged": "false", "facing": "south", "type": "single"}},
-    "ender_chest": {"id": "minecraft:ender_chest",
-                     "properties": {"waterlogged": "false", "facing": "south"}},
 }
 PACK_META = {"pack": {"description": "Keeper temples in every vanilla village — Java 26.3 only",
                        "min_format": [121, 0], "max_format": [121, 0]}}
 PASSABLE = {"minecraft:air", "minecraft:cave_air", "minecraft:structure_void"}
 SOLID = {"minecraft:smooth_stone", "minecraft:chiseled_stone_bricks", "minecraft:sandstone",
-         "minecraft:stripped_oak_log", "minecraft:stripped_oak_wood", "minecraft:stripped_acacia_log",
-         "minecraft:stripped_acacia_wood", "minecraft:stripped_spruce_log", "minecraft:stripped_spruce_wood",
-         "minecraft:snow_block", "minecraft:dirt_path", "minecraft:grass_block", "minecraft:cobblestone",
-         "minecraft:smooth_sandstone", "minecraft:sand", "minecraft:mossy_cobblestone"}
+         "minecraft:smooth_sandstone", "minecraft:stripped_oak_log", "minecraft:stripped_oak_wood",
+         "minecraft:stripped_acacia_log", "minecraft:stripped_acacia_wood", "minecraft:stripped_spruce_log",
+         "minecraft:stripped_spruce_wood", "minecraft:snow_block", "minecraft:dirt_path",
+         "minecraft:grass_block", "minecraft:cobblestone", "minecraft:sand", "minecraft:mossy_cobblestone"}
 
 
 def json_bytes(value):
@@ -131,7 +132,7 @@ def reachable(blocks, start, floor):
 
 
 def validate_root(root, record, *, rotations=range(4)):
-    """Consumer-visible geometry/jigsaw checks; raise ValueError on defects."""
+    """Consumer-visible Greek composition and jigsaw checks."""
     size = root["size"]
     if root.get("DataVersion") != 5023 or root.get("entities"):
         raise ValueError("Wrong DataVersion or embedded entities")
@@ -159,8 +160,8 @@ def validate_root(root, record, *, rotations=range(4)):
     expected_container_positions = set(containers.values())
     seen_container_positions = {position for position, state in blocks.items()
                                 if state["id"] in CONTAINER_IDS.values()}
-    if seen_container_positions != expected_container_positions:
-        raise ValueError("Expected exactly one offering chest and one ender chest")
+    if seen_container_positions != expected_container_positions or set(containers) != {"offering_chest"}:
+        raise ValueError("Expected exactly one normal offering chest and no ender chest")
     for name, position in containers.items():
         block = entries.get(position)
         state = blocks.get(position, {})
@@ -169,27 +170,47 @@ def validate_root(root, record, *, rotations=range(4)):
         payload = block.get("nbt", {})
         if payload.get("id") != CONTAINER_IDS[name]:
             raise ValueError(f"Invalid {name} block entity ID")
-        if name == "offering_chest":
-            if "Items" not in payload or len(payload["Items"]) != 0 or "LootTable" in payload:
-                raise ValueError("Offering chest must start empty without a loot table")
+        if "Items" not in payload or len(payload["Items"]) != 0 or "LootTable" in payload:
+            raise ValueError("Offering chest must start empty without a loot table")
     ax, ay, az = record["altar"]["base"]
     if sum(state["id"] == ALTAR_BASE for state in blocks.values()) != 1:
         raise ValueError("Expected exactly one Keeper altar")
     if blocks.get((ax, ay, az), {}).get("id") != ALTAR_BASE or blocks.get((ax, ay + 1, az)) != ALTAR_TOP:
         raise ValueError("Altar identity/position changed")
     x0, z0 = record["room_min"]
-    wall, roof = MATERIALS[record["style"]]
+    materials = MATERIALS[record["style"]]
+    wall = "minecraft:" + materials["wall"]
+    column = "minecraft:" + materials["column"]
+    roof = "minecraft:" + materials["roof"]
     entry = tuple(record["entry"])
+    greek = record["greek"]
+    foundation = {tuple(position) for position in greek["foundation"]}
+    columns = {tuple(position) for position in greek["columns"]}
+    pediment = {tuple(position) for position in greek["pediment"]}
+    for position in foundation:
+        if blocks.get(position, {}).get("id") != FOUNDATION:
+            raise ValueError("Greek stepped foundation is incomplete")
+    for position in columns:
+        if blocks.get(position, {}).get("id") != column:
+            raise ValueError("Greek column rhythm is incomplete")
+    for position in pediment:
+        if blocks.get(position, {}).get("id") != roof:
+            raise ValueError("Greek pediment is incomplete")
+    if len(columns) < 6 or len(pediment) < 4:
+        raise ValueError("Greek composition is too small")
     for x in range(x0, x0 + 5):
         for z in range(z0, z0 + 5):
-            if blocks.get((x, floor + 4, z), {}).get("id") != "minecraft:" + roof:
+            if blocks.get((x, floor + 4, z), {}).get("id") != roof:
                 raise ValueError("Incomplete solid roof or wrong biome material")
             if x in (x0, x0 + 4) or z in (z0, z0 + 4):
                 for y in range(floor + 1, floor + 4):
+                    position = (x, y, z)
                     if (x, z) == (entry[0], entry[2]) and y in (entry[1], entry[1] + 1):
                         continue
-                    if blocks.get((x, y, z), {}).get("id") != "minecraft:" + wall:
-                        raise ValueError("Incomplete biome-appropriate temple shell")
+                    expected_state = column if position in columns else (
+                        FOUNDATION if position in foundation and y == floor + 1 else wall)
+                    if blocks.get(position, {}).get("id") != expected_state:
+                        raise ValueError("Incomplete Greek temple shell")
             for y in range(floor + 1):
                 if blocks.get((x, y, z), {}).get("id") not in SOLID:
                     raise ValueError("Unsupported temple floor")
@@ -222,7 +243,8 @@ def validate_root(root, record, *, rotations=range(4)):
         for x, z in seen:
             if any(rotated.get((x, y, z), {}).get("id") not in SOLID for y in range(floor + 1)):
                 raise ValueError("Unsupported walking route")
-    return {"rotations": len(tuple(rotations)), "roads": len(roads), "altar": list((ax, ay, az))}
+    return {"rotations": len(tuple(rotations)), "roads": len(roads), "altar": list((ax, ay, az)),
+            "columns": len(columns), "pediment": len(pediment), "foundation": len(foundation)}
 
 
 def validate_processors(root, record, processors, tags):
@@ -233,6 +255,11 @@ def validate_processors(root, record, processors, tags):
     floor = record["floor_y"]
     x0, z0 = record["room_min"]
     ax, ay, az = record["altar"]["base"]
+    greek = record["greek"]
+    critical_positions = ({tuple(position) for position in greek["foundation"]}
+                          | {tuple(position) for position in greek["columns"]}
+                          | {tuple(position) for position in greek["pediment"]}
+                          | {(ax, ay, az), (ax, ay + 1, az)})
 
     def state(value):
         return {"id": value} if isinstance(value, str) else value
@@ -278,6 +305,10 @@ def validate_processors(root, record, processors, tags):
             if any(candidate != original for candidate in candidates):
                 raise ValueError("Processor can change approved container")
             continue
+        if (x, y, z) in critical_positions and any(candidate != original for candidate in candidates):
+            if (x, y, z) in {(ax, ay, az), (ax, ay + 1, az)}:
+                raise ValueError("Processor can change recognizable altar")
+            raise ValueError("Processor can change Greek structural identity")
         if y <= floor or y == floor + 4 and x0 <= x <= x0 + 4 and z0 <= z <= z0 + 4:
             if any(candidate["id"] not in SOLID for candidate in candidates):
                 raise ValueError("Processor can remove floor support or solid roof")
@@ -354,9 +385,12 @@ def author_root(source, recipe):
     x0, z0 = recipe["room_min"]
     if not (1 <= x0 <= w - 6 and 1 <= z0 <= d - 6):
         raise ValueError("Room cannot retain a walkable perimeter inside vanilla footprint")
-    height = max(h, floor + 5)
+    height = max(h, floor + 7)
     root["size"] = nbt.List([w, height, d], item_tag=3)
-    wall, roof = MATERIALS[recipe["style"]]
+    materials = MATERIALS[recipe["style"]]
+    wall = materials["wall"]
+    column = materials["column"]
+    roof = materials["roof"]
     palette = []
     placed = {}
 
@@ -376,32 +410,62 @@ def author_root(source, recipe):
         for z in range(d):
             for y in range(height):
                 put((x, y, z), "smooth_stone" if y <= floor else "air")
-    for x in range(x0, x0 + 5):
-        for z in range(z0, z0 + 5):
-            if x in (x0, x0 + 4) or z in (z0, z0 + 4):
-                for y in range(floor + 1, floor + 4):
-                    put((x, y, z), wall)
-            put((x, floor + 4, z), roof)
+
     entry = [x0 + 2, floor + 1, z0]
-    for y in (floor + 1, floor + 2):
-        put((entry[0], y, entry[2]), "air")
+    column_positions = {(x, y, z0) for x in (x0 + 1, x0 + 3) for y in range(floor + 1, floor + 4)}
+    foundation_positions = {
+        (x, floor + 1, z)
+        for x in range(x0, x0 + 5)
+        for z in range(z0, z0 + 5)
+        if (x in (x0, x0 + 4) or z in (z0, z0 + 4)) and (x, z) != (entry[0], entry[2])
+    } - column_positions
+    pediment_positions = {(x, floor + 5, z0) for x in range(x0 + 1, x0 + 4)}
+    pediment_positions.add((x0 + 2, floor + 6, z0))
     altar = [x0 + 2, floor + 1, z0 + 3]
     put(altar, ALTAR_BASE)
     put((altar[0], altar[1] + 1, altar[2]), ALTAR_TOP)
+
+    for position in sorted(foundation_positions):
+        put(position, FOUNDATION)
+    for position in sorted(column_positions):
+        put(position, column)
+    for x in range(x0, x0 + 5):
+        for z in range(z0, z0 + 5):
+            if not (x in (x0, x0 + 4) or z in (z0, z0 + 4)):
+                continue
+            for y in range(floor + 1, floor + 4):
+                position = (x, y, z)
+                if (x, z) == (entry[0], entry[2]) and y in (entry[1], entry[1] + 1):
+                    put(position, "air")
+                elif position in column_positions or position in foundation_positions:
+                    continue
+                else:
+                    put(position, wall)
+    for x in range(x0, x0 + 5):
+        for z in range(z0, z0 + 5):
+            put((x, floor + 4, z), roof)
+    for position in sorted(pediment_positions):
+        put(position, roof)
+
     containers = {
         name: [x0 + offset[0], floor + offset[1], z0 + offset[2]]
         for name, offset in CONTAINER_OFFSETS.items()
     }
     container_positions = {tuple(position) for position in containers.values()}
     source_joint_positions = {tuple(block["pos"]) for block in source_joints}
+    feature_positions = (foundation_positions | column_positions | pediment_positions
+                         | {tuple(altar), (altar[0], altar[1] + 1, altar[2])}
+                         | container_positions)
+    road_positions = {tuple(block["pos"]) for block in roads}
     if source_joint_positions & container_positions:
         raise ValueError("Vanilla jigsaw collides with an approved container position")
+    if road_positions & feature_positions:
+        raise ValueError("Vanilla road jigsaw collides with the Greek composition")
     for name, position in containers.items():
-        metadata = {"id": CONTAINER_IDS[name]}
-        if name == "offering_chest":
-            metadata["Items"] = nbt.List([], item_tag=10)
+        metadata = {"id": CONTAINER_IDS[name], "Items": nbt.List([], item_tag=10)}
         put(position, CONTAINER_STATES[name], metadata)
-    occupied = {tuple(b["pos"]) for b in roads} | container_positions
+    occupied = road_positions | feature_positions
+    feature_xy = {(x, z) for x, _y, z in feature_positions}
     adjustments = []
     final_joints = []
     for index, block in enumerate(source_joints):
@@ -411,9 +475,6 @@ def author_root(source, recipe):
         state = copy.deepcopy(source["palette"][block["state"]])
         if not is_road(block):
             final = metadata["final_state"].split("[")[0]
-            # Preserve spawn height for void markers; solid final states belong
-            # in the plaza floor, never at a player's feet/head. Decoration
-            # sockets keep an extra lateral buffer outside the solid shell.
             y = floor + 1 if final in PASSABLE else floor
             decor = metadata["pool"].endswith("/decor")
 
@@ -421,7 +482,7 @@ def author_root(source, recipe):
                 margin = 1 if decor else 0
                 if x0 - margin <= x <= x0 + 4 + margin and z0 - margin <= z <= z0 + 4 + margin:
                     return False
-                if x == entry[0] and z <= z0 + 1:
+                if (x, z) in feature_xy or (x == entry[0] and z <= z0 + 1):
                     return False
                 return (x, y, z) not in occupied
 
@@ -432,7 +493,7 @@ def author_root(source, recipe):
                 position = list(min(candidates, key=lambda p: (abs(p[0] - original[0]) + abs(p[2] - original[2]), p)))
             if position != original:
                 adjustments.append({"index": index, "from": original, "to": position,
-                                    "reason": "Keep room/entry clear and final state on supported open plaza; decor buffered from roof"})
+                                    "reason": "Keep Greek temple, entry, and final state on supported open plaza"})
         occupied.add(tuple(position))
         put(position, state, metadata)
         final_joints.append({"pos": position, "state": state, "nbt": copy.deepcopy(metadata)})
@@ -445,7 +506,12 @@ def author_root(source, recipe):
               "altar": {"base": altar, "top": [altar[0], altar[1] + 1, altar[2]],
                         "approach": [altar[0], floor + 1, altar[2] - 1]},
               "containers": containers,
-              "materials": {"wall": "minecraft:" + wall, "roof": "minecraft:" + roof,
+              "greek": {"foundation": [list(position) for position in sorted(foundation_positions)],
+                        "columns": [list(position) for position in sorted(column_positions)],
+                        "pediment": [list(position) for position in sorted(pediment_positions)],
+                        "approach_steps": []},
+              "materials": {"column": "minecraft:" + column, "wall": "minecraft:" + wall,
+                            "roof": "minecraft:" + roof, "foundation": FOUNDATION,
                             "floor": "minecraft:smooth_stone"},
               "source_jigsaws": [joint_record(source, b) for b in source_joints],
               "jigsaws": final_joints, "connector_adjustments": adjustments}
@@ -459,6 +525,8 @@ def generate(archive, output=DEFAULT_OUTPUT):
     if checksum != ARCHIVE_SHA256:
         raise ValueError("Archive checksum does not match pinned Java 26.3 source")
     recipes = json.loads(RECIPES.read_bytes())
+    if recipes.get("composition") != "greek_temple" or recipes.get("room_size") != [5, 5]:
+        raise ValueError("Recipes must declare the Greek 5x5 temple composition")
     emitted = {}
     with zipfile.ZipFile(archive) as source:
         version = json.loads(source.read("version.json"))

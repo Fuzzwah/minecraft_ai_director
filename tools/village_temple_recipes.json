@@ -1,5 +1,6 @@
 {
-  "schema": 1,
+  "schema": 2,
+  "composition": "greek_temple",
   "room_size": [
     5,
     5
