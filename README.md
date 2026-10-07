@@ -75,13 +75,15 @@ podman exec mc_ai_director_default rcon-cli 'setworldspawn <x> <y> <z>'
 podman exec mc_ai_director_default rcon-cli 'save-all flush'
 ```
 
-For the current regenerated live world, the nearest result is the taiga village
-at `[112, ~, 32]`. Its verified support is
-`[112, 71, 32] = minecraft:smooth_stone`, so the persisted world spawn is
-`[112, 72, 32]`. This changes only the default world spawn. Beds and respawn
-anchors remain authoritative for players who have set them. The Director's
-quest/turn-in coordinates (`SPAWN_X`, `SPAWN_Y`, `SPAWN_Z`) are a separate
-contract and are not changed by this world-spawn adjustment.
+For the current regenerated live world, the nearest result is the plains village
+at `[352, ~, -832]`. Its verified support is
+`[352, 73, -832] = minecraft:smooth_stone`, with clear air at `[352, 74, -832]`,
+so the persisted world spawn is `[352, 74, -832]`. This changes only the
+default world spawn. Beds and respawn anchors remain authoritative for players
+who have set them. The Director's quest/turn-in coordinates
+(`SPAWN_X`, `SPAWN_Y`, `SPAWN_Z`) are a separate contract and are not changed by
+this world-spawn adjustment.
+
 ## Run the existing Director
 
 Requires Python 3.10+ and a Java server with RCON enabled. Keep RCON private.
