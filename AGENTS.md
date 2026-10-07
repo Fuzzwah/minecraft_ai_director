@@ -68,6 +68,14 @@ by default; enabling them requires both `DIRECTOR_SETTLEMENT_ENABLED=1` and
   source without touching the old inventory. Preserve **both** quest JSON
   (`DIRECTOR_STATE`) and SQLite (`DIRECTOR_DATABASE`), plus the matching world
   and configuration. Never run two Director loops against the same quest JSON.
+- Opening quests require verified mature/harvestable local supply within 32
+  horizontal blocks of the selected village quest hub and supply-backed minimum
+  quantities. Do not treat whole-section palette totals as nearby availability.
+  Active communal/private quests and pending operations reserve distinct item
+  IDs, including offline personal targets. Preserve reservations and lane
+  warm-up progress across restarts; only fully successful completion advances
+  progress once. Retire only untouched policy-invalid legacy assignments, never
+  pending or uncertain operations; this upgrade does not regenerate the world.
 - `world_id` is a stable world identity, not a retry switch. Do not delete the DB,
   reset initialization flags, change world IDs, or relocate occupied/reserved/
   protected plots to get past a failure.

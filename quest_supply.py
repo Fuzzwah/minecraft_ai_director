@@ -13,7 +13,7 @@ import struct
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable
 
 from tools import nbt
 
@@ -47,7 +47,18 @@ class PlayerProfile:
 
 
 class AnvilWorldReader:
-    """Read saved overworld chunks without mutating them."""
+    """Read complete, stable Java 26.3 overworld observations without writes."""
+
+    _DATA_VERSION = 5023
+    _SECTION_Y = range(-4, 20)
+    _AIR = {"minecraft:air", "minecraft:cave_air", "minecraft:void_air"}
+    _CROPS = {
+        "minecraft:wheat": ("minecraft:wheat", "7"),
+        "minecraft:carrots": ("minecraft:carrot", "7"),
+        "minecraft:potatoes": ("minecraft:potato", "7"),
+        "minecraft:beetroots": ("minecraft:beetroot", "3"),
+    }
+    _CONTAINERS = {"minecraft:chest", "minecraft:trapped_chest", "minecraft:barrel"}
 
     def __init__(self, world_path: Path):
         self.world_path = Path(world_path)
@@ -61,206 +72,306 @@ class AnvilWorldReader:
         self.entities_dir = self.overworld / "entities"
 
     @staticmethod
-    def _region_coordinate(chunk: int) -> int:
-        return chunk // 32
+    def _region_file(directory: Path, chunk_x: int, chunk_z: int) -> Path:
+        return directory / f"r.{chunk_x // 32}.{chunk_z // 32}.mca"
 
     @staticmethod
-    def _region_file(directory: Path, rx: int, rz: int) -> Path:
-        return directory / f"r.{rx}.{rz}.mca"
+    def _identity(path: Path) -> tuple | None:
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            return None
+        return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
 
     @staticmethod
-    def _header_entry(header: bytes, local_x: int, local_z: int) -> tuple[int, int]:
-        offset = 4 * (local_x + local_z * 32)
-        value = int.from_bytes(header[offset:offset + 4], "big")
-        return value >> 8, value & 0xFF
-
-    @classmethod
-    def _read_chunk(cls, path: Path, chunk_x: int, chunk_z: int):
-        if not path.is_file():
-            raise FileNotFoundError(path)
-        payload = path.read_bytes()
+    def _chunk_from_region(payload: bytes, chunk_x: int, chunk_z: int) -> dict | None:
         if len(payload) < 8192:
-            raise ValueError("truncated Anvil header")
-        offset, sectors = cls._header_entry(payload[:4096], chunk_x & 31, chunk_z & 31)
-        if offset == 0 or sectors == 0:
-            raise FileNotFoundError(f"missing chunk {chunk_x},{chunk_z}")
+            raise ValueError("invalid Anvil region size")
+        index = 4 * ((chunk_x & 31) + (chunk_z & 31) * 32)
+        location = int.from_bytes(payload[index:index + 4], "big")
+        offset, sectors = location >> 8, location & 255
+        if not offset and not sectors:
+            return None
+        if offset < 2 or not sectors or offset * 4096 + 5 > len(payload):
+            raise ValueError("invalid Anvil chunk allocation")
         start = offset * 4096
-        if start + 5 > len(payload):
-            raise ValueError("chunk offset outside region")
         length = int.from_bytes(payload[start:start + 4], "big")
-        if length < 1 or start + 4 + length > len(payload):
-            raise ValueError("invalid chunk length")
+        if length < 1 or length + 4 > sectors * 4096 or start + 4 + length > len(payload):
+            raise ValueError("invalid Anvil chunk length")
         compression = payload[start + 4]
-        compressed = payload[start + 5:start + 4 + length]
+        raw = payload[start + 5:start + 4 + length]
         if compression == 1:
-            raw = gzip.decompress(compressed)
+            raw = gzip.decompress(raw)
         elif compression == 2:
-            raw = zlib.decompress(compressed)
-        elif compression == 3:
-            raw = compressed
-        else:
+            inflater = zlib.decompressobj()
+            raw = inflater.decompress(raw)
+            if not inflater.eof or inflater.unused_data or inflater.unconsumed_tail:
+                raise ValueError("invalid compressed Anvil record length")
+        elif compression != 3:
             raise ValueError(f"unsupported Anvil compression {compression}")
         return nbt.loads(raw)
 
-    @staticmethod
-    def _sections(chunk: dict) -> Iterable[dict]:
-        sections = chunk.get("sections", chunk.get("Level", {}).get("Sections", []))
-        return sections if isinstance(sections, (list, tuple)) else []
-
-    @staticmethod
-    def _palette(section: dict):
-        states = section.get("block_states", section.get("BlockStates"))
-        if not isinstance(states, dict):
-            return (), ()
-        palette = states.get("palette", states.get("Palette", []))
-        data = states.get("data", states.get("Data", []))
-        if not isinstance(palette, (list, tuple)):
-            return (), ()
-        return palette, data if isinstance(data, (list, tuple)) else ()
-
-    @staticmethod
-    def _palette_counts(palette, packed) -> Iterable[tuple[dict, int]]:
-        if not palette:
-            return ()
-        if len(palette) == 1:
-            return ((palette[0], 4096),)
-        if not packed:
-            raise ValueError("palette has no packed block-state data")
-        bits = max(4, (len(palette) - 1).bit_length())
-        mask = (1 << bits) - 1
-        words = [int(word) & ((1 << 64) - 1) for word in packed]
-        counts = [0] * len(palette)
-        for index in range(4096):
-            bit = index * bits
-            word = bit // 64
-            shift = bit % 64
-            value = words[word] >> shift
-            used = 64 - shift
-            if used < bits and word + 1 < len(words):
-                value |= words[word + 1] << used
-            palette_index = value & mask
-            if palette_index < len(counts):
-                counts[palette_index] += 1
-        return tuple((state, count) for state, count in zip(palette, counts) if count)
-
-    @staticmethod
-    def _state_id(state: dict | str) -> str:
+    @classmethod
+    def _normalize_state(cls, state: dict | str, version: int) -> tuple[str, dict[str, str]]:
+        if version != cls._DATA_VERSION:
+            raise ValueError(f"unsupported block-state DataVersion {version}")
         if isinstance(state, str):
-            return state
-        if not isinstance(state, dict):
-            return ""
-        return state.get("Name", state.get("name", state.get("id", "")))
+            block_id, properties = state, {}
+        elif isinstance(state, dict):
+            # Java 26.3's heterogeneous codec list wraps its string alternative
+            # in an empty-name compound. Keep the trusted NBT types intact.
+            if set(state) == {""}:
+                block_id, properties = state[""], {}
+            elif "id" in state and set(state) <= {"id", "properties"}:
+                block_id, properties = state["id"], state.get("properties", {})
+            elif "Name" in state and set(state) <= {"Name", "Properties"}:
+                block_id, properties = state["Name"], state.get("Properties", {})
+            else:
+                raise ValueError("unsupported block-state palette representation")
+        else:
+            raise ValueError("invalid block-state palette entry")
+        if not isinstance(block_id, str) or not re.fullmatch(r"[a-z0-9_.-]+:[a-z0-9_./-]+", block_id):
+            raise ValueError("invalid block-state id")
+        if not isinstance(properties, dict) or any(
+            not isinstance(key, str) or not isinstance(value, str) for key, value in properties.items()
+        ):
+            raise ValueError("invalid block-state properties")
+        return block_id, properties
+
+    @classmethod
+    def _decode_section(cls, section: dict, version: int) -> tuple[list, list[int]]:
+        if not isinstance(section, dict):
+            raise ValueError("invalid section")
+        states = section.get("block_states")
+        if not isinstance(states, dict) or set(states) - {"palette", "data"}:
+            raise ValueError("unsupported block-state layout")
+        palette = states.get("palette")
+        if not isinstance(palette, (list, tuple)) or not 1 <= len(palette) <= 4096:
+            raise ValueError("invalid block-state palette length")
+        normalized = [cls._normalize_state(state, version) for state in palette]
+        packed = states.get("data")
+        if len(palette) == 1:
+            if packed is not None:
+                raise ValueError("single-state section has unexpected packed data")
+            return normalized, [0] * 4096
+        if not isinstance(packed, nbt.LongArray):
+            raise ValueError("block states require an NBT long array")
+        bits = max(4, (len(palette) - 1).bit_length())
+        per_word = 64 // bits
+        if len(packed) != (4096 + per_word - 1) // per_word:
+            raise ValueError("invalid padded block-state array length")
+        mask = (1 << bits) - 1
+        indices = []
+        # Since Java 1.16 entries do not cross word boundaries. Actual 5023
+        # five-bit palettes have 342 words, not the continuous layout's 320.
+        for word_index, signed_word in enumerate(packed):
+            if not isinstance(signed_word, int) or not -(1 << 63) <= signed_word < (1 << 63):
+                raise ValueError("invalid packed block-state word")
+            word = signed_word & ((1 << 64) - 1)
+            entries = min(per_word, 4096 - word_index * per_word)
+            for slot in range(entries):
+                index = (word >> (slot * bits)) & mask
+                if index >= len(palette):
+                    raise ValueError("block-state palette index out of range")
+                indices.append(index)
+        return normalized, indices
 
     @staticmethod
-    def _item_id(stack: dict) -> str:
-        return stack.get("id", stack.get("Id", ""))
+    def _integer(value, label: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"invalid {label}")
+        return value
+
+    @classmethod
+    def _decode_chunk(cls, chunk: dict, chunk_x: int, chunk_z: int) -> dict:
+        version = cls._integer(chunk.get("DataVersion"), "DataVersion")
+        if version != cls._DATA_VERSION or chunk.get("Status") != "minecraft:full":
+            raise ValueError("unsupported or unfinished saved chunk")
+        if (cls._integer(chunk.get("xPos"), "xPos"), cls._integer(chunk.get("zPos"), "zPos")) != (chunk_x, chunk_z):
+            raise ValueError("saved chunk coordinates mismatch")
+        if cls._integer(chunk.get("yPos"), "yPos") != -4:
+            raise ValueError("unsupported overworld vertical layout")
+        sections = chunk.get("sections")
+        if not isinstance(sections, (list, tuple)):
+            raise ValueError("missing sections")
+        decoded = {}
+        for section in sections:
+            if not isinstance(section, dict):
+                raise ValueError("invalid section")
+            section_y = cls._integer(section.get("Y"), "section Y")
+            if section_y not in cls._SECTION_Y or section_y in decoded:
+                raise ValueError("invalid or duplicate section Y")
+            decoded[section_y] = cls._decode_section(section, version)
+        if set(decoded) != set(cls._SECTION_Y):
+            raise ValueError("incomplete saved column sections")
+        return decoded
 
     @staticmethod
-    def _item_count(stack: dict) -> int:
-        value = stack.get("count", stack.get("Count", 0))
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return 0
+    def _block(decoded: dict, x: int, y: int, z: int) -> tuple[str, dict]:
+        palette, indices = decoded[y // 16]
+        return palette[indices[(y & 15) * 256 + (z & 15) * 16 + (x & 15)]]
 
-    @staticmethod
-    def _supply_item(block_id: str) -> str | None:
-        direct = {
-            "minecraft:carrots": "minecraft:carrot",
-            "minecraft:wheat": "minecraft:wheat",
-            "minecraft:potatoes": "minecraft:potato",
-            "minecraft:beetroots": "minecraft:beetroot",
-            "minecraft:pumpkin": "minecraft:pumpkin",
-            "minecraft:melon": "minecraft:melon",
-            "minecraft:oak_log": "minecraft:oak_log",
-            "minecraft:hay_block": "minecraft:wheat",
-        }
-        return direct.get(block_id)
+    @classmethod
+    def _top(cls, decoded: dict, x: int, z: int) -> int | None:
+        for section_y in reversed(cls._SECTION_Y):
+            palette, indices = decoded[section_y]
+            if len(palette) == 1 and palette[0][0] in cls._AIR:
+                continue
+            for local_y in range(15, -1, -1):
+                if palette[indices[local_y * 256 + z * 16 + x]][0] not in cls._AIR:
+                    return section_y * 16 + local_y
+        return None
 
-    @staticmethod
-    def _position(entity: dict) -> tuple[float, float, float] | None:
-        position = entity.get("Pos", entity.get("pos"))
-        if not isinstance(position, (list, tuple)) or len(position) != 3:
-            return None
-        try:
-            return tuple(float(value) for value in position)
-        except (TypeError, ValueError):
-            return None
+    @classmethod
+    def _stack(cls, stack: dict) -> tuple[str, int]:
+        if not isinstance(stack, dict):
+            raise ValueError("invalid item stack")
+        item = stack.get("id")
+        count = cls._integer(stack.get("count"), "stack count")
+        if not isinstance(item, str) or not re.fullmatch(r"[a-z0-9_.-]+:[a-z0-9_./-]+", item) or count <= 0:
+            raise ValueError("invalid item stack id/count")
+        return item, count
 
-    def snapshot(self, x: float, y: float, z: float, radius: int = 64) -> SupplySnapshot:
+    @classmethod
+    def _observe_blocks(cls, snapshot: SupplySnapshot, chunk: dict, decoded: dict,
+                        chunk_x: int, chunk_z: int, inside: Callable, warmup: bool) -> None:
+        tops = {}
+        for local_z in range(16):
+            for local_x in range(16):
+                world_x, world_z = chunk_x * 16 + local_x, chunk_z * 16 + local_z
+                if not inside(world_x, world_z):
+                    continue
+                top = cls._top(decoded, local_x, local_z)
+                tops[local_x, local_z] = top
+                if top is None or top <= -64:
+                    continue
+                block, properties = cls._block(decoded, local_x, top, local_z)
+                support = cls._block(decoded, local_x, top - 1, local_z)[0]
+                if block in cls._CROPS:
+                    item, age = cls._CROPS[block]
+                    if properties.get("age") == age and support == "minecraft:farmland":
+                        snapshot.add(item, 1, "spawn_blocks")
+                elif support not in cls._AIR and support not in {"minecraft:water", "minecraft:lava"}:
+                    if block == "minecraft:pumpkin":
+                        snapshot.add("minecraft:pumpkin", 1, "spawn_blocks")
+                    elif block == "minecraft:hay_block":
+                        snapshot.add("minecraft:wheat", 9, "spawn_blocks")
+                    elif not warmup and block == "minecraft:oak_log":
+                        snapshot.add("minecraft:oak_log", 1, "spawn_blocks")
+        containers = chunk.get("block_entities")
+        if not isinstance(containers, (list, tuple)):
+            raise ValueError("missing block entities")
+        seen = set()
+        for container in containers:
+            if not isinstance(container, dict):
+                raise ValueError("invalid block entity")
+            if container.get("id") not in cls._CONTAINERS:
+                continue
+            cx, cy, cz = (cls._integer(container.get(axis), f"container {axis}") for axis in ("x", "y", "z"))
+            if cx // 16 != chunk_x or cz // 16 != chunk_z or not -64 <= cy < 320:
+                raise ValueError("container coordinates outside chunk")
+            if (cx, cy, cz) in seen:
+                raise ValueError("duplicate container")
+            seen.add((cx, cy, cz))
+            if not inside(cx, cz):
+                continue
+            if cls._block(decoded, cx & 15, cy, cz & 15)[0] != container["id"]:
+                raise ValueError("container block mismatch")
+            if "LootTable" in container:
+                if not isinstance(container["LootTable"], str) or "Items" in container:
+                    raise ValueError("ambiguous saved container inventory")
+                # An unopened loot-table chest has no realized item stacks.
+                # Observing it must not generate loot or invent its contents.
+                continue
+            stacks = container.get("Items")
+            if not isinstance(stacks, (list, tuple)):
+                raise ValueError("invalid container inventory")
+            parsed = [cls._stack(stack) for stack in stacks]
+            if tops[cx & 15, cz & 15] == cy:
+                for item, count in parsed:
+                    snapshot.add(item, count, "spawn_containers")
+
+    @classmethod
+    def _observe_entities(cls, snapshot: SupplySnapshot, root: dict, chunk_x: int,
+                          chunk_z: int, inside: Callable, decoded: dict) -> None:
+        if cls._integer(root.get("DataVersion"), "entity DataVersion") != cls._DATA_VERSION:
+            raise ValueError("unsupported entity DataVersion")
+        position = root.get("Position")
+        if not isinstance(position, nbt.IntArray) or list(position) != [chunk_x, chunk_z]:
+            raise ValueError("entity chunk coordinates mismatch")
+        entities = root.get("Entities")
+        if not isinstance(entities, (list, tuple)):
+            raise ValueError("invalid entities")
+        for entity in entities:
+            if not isinstance(entity, dict):
+                raise ValueError("invalid saved entity")
+            if entity.get("id") != _ITEM_ENTITY_ID:
+                continue
+            pos = entity.get("Pos")
+            if not isinstance(pos, (list, tuple)) or len(pos) != 3 or any(
+                not isinstance(value, (int, float)) or not math.isfinite(value) for value in pos
+            ):
+                raise ValueError("invalid item entity position")
+            if math.floor(pos[0]) // 16 != chunk_x or math.floor(pos[2]) // 16 != chunk_z:
+                raise ValueError("item entity coordinates outside chunk")
+            if inside(pos[0], pos[2]):
+                item, count = cls._stack(entity.get("Item"))
+                top = cls._top(decoded, math.floor(pos[0]) & 15, math.floor(pos[2]) & 15)
+                if top is not None and pos[1] >= top + 1:
+                    snapshot.add(item, count, "nearby_drops")
+
+    def snapshot(self, x: float, y: float, z: float, radius: int = 64, *,
+                 warmup: bool = False, loaded: Callable[[int, int], bool] | None = None) -> SupplySnapshot:
+        """Observe a horizontal disk; absent ``loaded`` is an offline copied-world read."""
         snapshot = SupplySnapshot()
-        center_x, center_z = int(math.floor(x)), int(math.floor(z))
-        min_chunk_x = (center_x - radius) // 16
-        max_chunk_x = (center_x + radius) // 16
-        min_chunk_z = (center_z - radius) // 16
-        max_chunk_z = (center_z + radius) // 16
-        expected = 0
-        readable = 0
-        for chunk_x in range(min_chunk_x, max_chunk_x + 1):
-            for chunk_z in range(min_chunk_z, max_chunk_z + 1):
-                expected += 1
-                region = self._region_file(self.region_dir, self._region_coordinate(chunk_x),
-                                           self._region_coordinate(chunk_z))
-                try:
-                    chunk = self._read_chunk(region, chunk_x, chunk_z)
-                except (FileNotFoundError, OSError, ValueError, EOFError, zlib.error, gzip.BadGzipFile):
-                    continue
-                try:
-                    for section in self._sections(chunk):
-                        palette, packed = self._palette(section)
-                        for state, count in self._palette_counts(palette, packed):
-                            item = self._supply_item(self._state_id(state))
-                            if item:
-                                snapshot.add(item, count, "spawn_blocks")
-                    for block_entity in chunk.get("block_entities", chunk.get("Level", {}).get("TileEntities", [])):
-                        if not isinstance(block_entity, dict):
-                            continue
-                        for stack in block_entity.get("Items", []):
-                            if isinstance(stack, dict):
-                                snapshot.add(self._item_id(stack), self._item_count(stack), "spawn_containers")
-                except (TypeError, ValueError, KeyError):
-                    continue
-                readable += 1
-        entities_complete = self._read_item_entities(snapshot, center_x, center_z, radius)
-        snapshot.complete = readable == expected and entities_complete and expected > 0
-        snapshot.reason = "complete" if snapshot.complete else f"read {readable}/{expected} spawn chunks"
-        return snapshot
+        cache = {}
+        identities = {}
+        try:
+            if any(not math.isfinite(value) for value in (x, y, z)) or not isinstance(radius, int) or radius < 0:
+                raise ValueError("invalid snapshot coordinates/radius")
+            inside = lambda bx, bz: (bx - x) ** 2 + (bz - z) ** 2 <= radius ** 2
+            chunks = []
+            for chunk_x in range(math.floor(x - radius) // 16, math.floor(x + radius) // 16 + 1):
+                for chunk_z in range(math.floor(z - radius) // 16, math.floor(z + radius) // 16 + 1):
+                    near_x = min(max(x, chunk_x * 16), chunk_x * 16 + 16)
+                    near_z = min(max(z, chunk_z * 16), chunk_z * 16 + 16)
+                    if inside(near_x, near_z):
+                        chunks.append((chunk_x, chunk_z))
+            if loaded is not None and any(loaded(cx, cz) is not True for cx, cz in chunks):
+                raise ValueError("relevant chunks are not verifiably loaded")
 
-    def _read_item_entities(self, snapshot: SupplySnapshot, center_x: int, center_z: int, radius: int) -> bool:
-        # An absent entity region is the normal Anvil representation for no
-        # saved entities. Existing entity regions must still decode fully.
-        if not self.entities_dir.is_dir():
-            return True
-        min_chunk_x = (center_x - radius) // 16
-        max_chunk_x = (center_x + radius) // 16
-        min_chunk_z = (center_z - radius) // 16
-        max_chunk_z = (center_z + radius) // 16
-        expected = 0
-        readable = 0
-        for chunk_x in range(min_chunk_x, max_chunk_x + 1):
-            for chunk_z in range(min_chunk_z, max_chunk_z + 1):
-                region = self._region_file(self.entities_dir, self._region_coordinate(chunk_x),
-                                           self._region_coordinate(chunk_z))
-                if not region.exists():
-                    continue
-                try:
-                    root = self._read_chunk(region, chunk_x, chunk_z)
-                except FileNotFoundError:
-                    continue
-                except (OSError, ValueError, EOFError, zlib.error, gzip.BadGzipFile):
-                    return False
-                expected += 1
-                readable += 1
-                for entity in root.get("Entities", root.get("entities", [])):
-                    if not isinstance(entity, dict) or entity.get("id") != _ITEM_ENTITY_ID:
-                        continue
-                    position = self._position(entity)
-                    if position is None or math.hypot(position[0] - center_x, position[2] - center_z) > radius:
-                        continue
-                    stack = entity.get("Item", entity.get("item", {}))
-                    if isinstance(stack, dict):
-                        snapshot.add(self._item_id(stack), self._item_count(stack), "nearby_drops")
-        return readable == expected
+            def region(directory, cx, cz, required):
+                path = self._region_file(directory, cx, cz)
+                if path not in cache:
+                    identities[path] = self._identity(path)
+                    cache[path] = path.read_bytes() if identities[path] is not None else None
+                payload = cache[path]
+                if payload is None:
+                    if required:
+                        raise ValueError("missing saved terrain region")
+                    return None
+                root = self._chunk_from_region(payload, cx, cz)
+                if root is None and required:
+                    raise ValueError("missing saved terrain chunk")
+                return root
+
+            for cx, cz in chunks:
+                chunk = region(self.region_dir, cx, cz, True)
+                decoded = self._decode_chunk(chunk, cx, cz)
+                self._observe_blocks(snapshot, chunk, decoded, cx, cz, inside, warmup)
+                entities = region(self.entities_dir, cx, cz, False)
+                if entities is not None:
+                    self._observe_entities(snapshot, entities, cx, cz, inside, decoded)
+            if loaded is not None and any(loaded(cx, cz) is not True for cx, cz in chunks):
+                raise ValueError("relevant chunks unloaded during observation")
+            if any(self._identity(path) != identity for path, identity in identities.items()):
+                raise ValueError("saved region changed during observation")
+        except (OSError, ValueError, EOFError, TypeError, KeyError, zlib.error) as error:
+            # Partial positive evidence must not escape even to an incautious caller.
+            return SupplySnapshot(reason=f"unavailable: {error}")
+        snapshot.complete = True
+        snapshot.reason = "complete"
+        return snapshot
 
 
 def parse_inventory_slots(response: str) -> list[dict]:

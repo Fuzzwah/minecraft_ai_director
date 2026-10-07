@@ -90,8 +90,7 @@ SETTLEMENT_PATH = Path(os.getenv("DIRECTOR_SETTLEMENT", "config/settlement.json"
 DATABASE_PATH = Path(os.getenv("DIRECTOR_DATABASE", "director_settlement.sqlite3"))
 
 QUEST_CATALOG = {
-    # Spawn-local items must be observed in the village area (or the target's
-    # own inventories for a private quest) before they can be requested.
+    # Warm-up uses verified nearby yield; later bands are progression-gated.
     "minecraft:wheat": {"min": 6, "max": 20, "band": "spawn_local"},
     "minecraft:carrot": {"min": 5, "max": 16, "band": "spawn_local"},
     "minecraft:potato": {"min": 5, "max": 16, "band": "spawn_local"},
@@ -122,6 +121,7 @@ BAND_ORDER = ("spawn_local", "early", "established", "nether_end", "endgame")
 BAND_THRESHOLDS = {"spawn_local": 0, "early": 12, "established": 35, "nether_end": 70, "endgame": 115}
 PRIVATE_PLAYER = "_private"
 COMMUNAL_PLAYER = "_communal"
+QUEST_POLICY_VERSION = 1
 
 # The model selects only a tier. Your code owns the actual economy.
 REWARDS = {
@@ -245,6 +245,9 @@ class Quest:
     candidate_band: str = "spawn_local"
     submission: str = "offering_chest"
     availability: list[str] = field(default_factory=list)
+    policy_version: int = 0
+    mode: str = "legacy"
+    reference_band: str | None = None
 
 
 @dataclass
@@ -275,6 +278,9 @@ class State:
     last_communal_quest_at: float = 0.0
     private_quest_at: dict[str, float] = field(default_factory=dict)
     pending_settlement_rewards: list[PendingReward] = field(default_factory=list)
+    communal_completions: int = 0
+    private_completions: dict[str, int] = field(default_factory=dict)
+    private_issued: dict[str, int] = field(default_factory=dict)
 
 
 def save_state(state: State) -> None:
@@ -286,6 +292,9 @@ def save_state(state: State) -> None:
         "last_communal_quest_at": state.last_communal_quest_at,
         "private_quest_at": state.private_quest_at,
         "pending_settlement_rewards": [asdict(pending) for pending in state.pending_settlement_rewards],
+        "communal_completions": state.communal_completions,
+        "private_completions": state.private_completions,
+        "private_issued": state.private_issued,
     }
     tmp = STATE_PATH.with_suffix(STATE_PATH.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -308,6 +317,9 @@ def load_state() -> State:
         data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             raise ValueError("state must be an object")
+        communal_completions = load_counter(data.get("communal_completions", 0), maximum=3)
+        private_completions = load_counter_map(data.get("private_completions", {}), maximum=3)
+        private_issued = load_counter_map(data.get("private_issued", {}))
         legacy_data = data.get("active_quest")
         legacy = load_saved_quest(legacy_data) if legacy_data is not None else None
         communal_data = data.get("communal_quest")
@@ -316,6 +328,7 @@ def load_state() -> State:
         if not isinstance(private_data, dict):
             raise ValueError("private quests must be an object")
         private = {player: load_saved_quest(raw) for player, raw in private_data.items()}
+        pending_ids = set()
         if legacy is not None and communal is None and not private:
             # Preserve old saves and their stable quest ID while assigning the
             # old inventory quest to the named player's private lane.
@@ -330,6 +343,9 @@ def load_state() -> State:
             entry = dict(entry)
             entry["quest"] = load_saved_quest(entry["quest"])
             reward = PendingReward(**entry)
+            if reward.quest.quest_id in pending_ids:
+                raise ValueError("duplicate pending quest ID")
+            pending_ids.add(reward.quest.quest_id)
             if type(reward.vanilla_choice) is not int or not 0 <= reward.vanilla_choice < len(REWARDS[reward.quest.reward_tier]):
                 raise ValueError("invalid pending vanilla reward")
             if reward.consumption not in {"prepared", "uncertain", "done"}:
@@ -360,22 +376,36 @@ def load_state() -> State:
             raise ValueError("invalid quest timestamp")
         state = State(active_quest=legacy, communal_quest=communal, private_quests=private,
                       last_quest_at=last_quest_at, last_communal_quest_at=last_communal_quest_at,
-                      private_quest_at=private_quest_at, pending_settlement_rewards=pending)
+                      private_quest_at=private_quest_at, pending_settlement_rewards=pending,
+                      communal_completions=communal_completions,
+                      private_completions=private_completions, private_issued=private_issued)
         migrated = (legacy_private_submission(legacy_data)
                     or legacy_private_submission(communal_data)
                     or any(legacy_private_submission(raw) for raw in private_data.values())
                     or any(legacy_private_submission(entry.get("quest")) for entry in pending_data))
-        if migrated:
+        if migrated and not DRY_RUN:
             save_state(state)
         return state
     except Exception as exc:
         print(f"[WARN] Could not load state: {exc}")
-        if not SETTLEMENT_ENABLED and not (
-            isinstance(locals().get("data"), dict) and data.get("pending_settlement_rewards")
-        ):
-            return State()
         # Never discard durable reward debt or overwrite an unreadable save.
         raise ValueError(f"Cannot safely load director state: {exc}") from exc
+
+
+def load_counter(value: object, *, maximum: int | None = None) -> int:
+    if type(value) is not int or value < 0 or (maximum is not None and value > maximum):
+        raise ValueError("invalid quest progression counter")
+    return value
+
+
+def load_counter_map(value: object, *, maximum: int | None = None) -> dict[str, int]:
+    if not isinstance(value, dict):
+        raise ValueError("quest progression counters must be an object")
+    for player, count in value.items():
+        if not isinstance(player, str) or not PLAYER_RE.fullmatch(player) or player in {COMMUNAL_PLAYER, PRIVATE_PLAYER}:
+            raise ValueError("invalid quest progression player")
+        load_counter(count, maximum=maximum)
+    return dict(value)
 
 
 def validate_reward_shape(reward: dict) -> dict:
@@ -415,6 +445,23 @@ def load_saved_quest(raw: dict) -> Quest:
         raise ValueError("invalid private quest owner")
     if quest.candidate_band not in BAND_ORDER:
         raise ValueError("invalid quest candidate band")
+    if type(quest.policy_version) is not int or not 0 <= quest.policy_version <= QUEST_POLICY_VERSION:
+        raise ValueError("invalid quest policy version")
+    if quest.mode not in {"legacy", "warmup", "communal", "long_term", "aspirational"}:
+        raise ValueError("invalid quest policy mode")
+    if quest.reference_band is not None and quest.reference_band not in BAND_ORDER:
+        raise ValueError("invalid quest reference band")
+    if quest.policy_version and (quest.mode == "legacy" or quest.reference_band is None):
+        raise ValueError("missing quest policy metadata")
+    if quest.policy_version:
+        band_index = BAND_ORDER.index(quest.candidate_band)
+        reference_index = BAND_ORDER.index(quest.reference_band)
+        if (quest.mode == "warmup" and (band_index != 0 or reference_index != 0)
+                or quest.mode == "communal" and (quest.lane != "communal" or band_index != reference_index)
+                or quest.mode in {"long_term", "aspirational"} and (
+                    quest.lane != "private"
+                    or band_index - reference_index != (2 if quest.mode == "aspirational" else 1))):
+            raise ValueError("inconsistent quest policy metadata")
     if quest.submission not in {"offering_chest", "ender_chest", "player_inventory"}:
         raise ValueError("invalid quest submission")
     if not isinstance(quest.availability, list) or any(not isinstance(item, str) for item in quest.availability):
@@ -486,11 +533,16 @@ def profiles_for(players: list[str]) -> dict[str, PlayerProfile]:
     return {player: player_profile(player) for player in players}
 
 
-def supply_snapshot() -> SupplySnapshot:
+def supply_snapshot(*, warmup: bool = False) -> SupplySnapshot:
     if not DRY_RUN:
         # Establish a server save boundary before reading the mounted Anvil files.
         rcon("save-all flush")
-    return AnvilWorldReader(WORLD_DATA_PATH).snapshot(SPAWN_X, SPAWN_Y, SPAWN_Z, SPAWN_SUPPLY_RADIUS)
+    def loaded(chunk_x: int, chunk_z: int) -> bool:
+        response = rcon(f"execute if loaded {chunk_x * 16} {int(SPAWN_Y)} {chunk_z * 16} run time query gametime")
+        return bool(re.fullmatch(r"The game time is \d+ tick\(s\)", response.strip()))
+    return AnvilWorldReader(WORLD_DATA_PATH).snapshot(
+        SPAWN_X, SPAWN_Y, SPAWN_Z, 32 if warmup else SPAWN_SUPPLY_RADIUS,
+        warmup=warmup, loaded=loaded)
 
 
 def progression_band(score: int) -> str:
@@ -501,29 +553,75 @@ def progression_band(score: int) -> str:
     return result
 
 
+def active_quests(state: State) -> list[Quest]:
+    ordered = ([state.communal_quest] if state.communal_quest else [])
+    ordered.extend(state.private_quests[player] for player in sorted(state.private_quests))
+    if state.active_quest:
+        ordered.append(state.active_quest)
+    seen = set()
+    return [quest for quest in ordered if not (quest.quest_id in seen or seen.add(quest.quest_id))]
+
+
+def reserved_items(state: State, *, exclude_id: str | None = None) -> set[str]:
+    records = active_quests(state) + [entry.quest for entry in state.pending_settlement_rewards]
+    return {quest.item for quest in records if quest.quest_id != exclude_id}
+
+
+def lane_warmup(state: State, lane: str, player: str | None = None) -> bool:
+    return (state.communal_completions if lane == "communal"
+            else state.private_completions.get(player, 0)) < 3
+
+
+def communal_reference(state: State, score: int) -> str:
+    if state.communal_quest:
+        return state.communal_quest.candidate_band
+    return "spawn_local" if lane_warmup(state, "communal") else progression_band(score)
+
+
 def candidate_items(lane: str, profile: PlayerProfile | None, snapshot: SupplySnapshot,
-                    score: int) -> list[dict]:
-    unlocked_index = BAND_ORDER.index(progression_band(score))
-    candidates = []
-    for item, definition in QUEST_CATALOG.items():
-        band = definition["band"]
-        if BAND_ORDER.index(band) > unlocked_index:
-            continue
-        sources = set(snapshot.sources.get(item, set()))
-        if profile is not None and item in profile.inventory_items:
-            sources.add("player_inventory")
-        if profile is not None and item in profile.ender_items:
-            sources.add("ender_inventory")
-        if band == "spawn_local":
-            observed = item in snapshot.items
-            owned = profile is not None and (item in profile.inventory_items or item in profile.ender_items)
-            if lane == "communal" and (not snapshot.complete or not observed):
+                    score: int, *, state: State | None = None, communal_score: int = 0,
+                    exclude_id: str | None = None) -> list[dict]:
+    if lane not in {"communal", "private"} or (lane == "private" and profile is None):
+        raise ValueError("invalid quest candidate lane or profile")
+    state = state if state is not None else State()
+    player = profile.player if profile else None
+    warmup = lane_warmup(state, lane, player)
+    reference = communal_reference(state, communal_score)
+    reserved = reserved_items(state, exclude_id=exclude_id)
+    if warmup:
+        bands = [("spawn_local", "warmup")]
+        reference = "spawn_local"
+    elif lane == "communal":
+        bands = [(progression_band(score), "communal")]
+        reference = progression_band(score)
+    else:
+        if profile.confidence != "complete":
+            return []
+        ceiling = BAND_ORDER.index(progression_band(profile.score))
+        normal = BAND_ORDER.index(reference) + 1
+        bands = []
+        if (state.private_issued.get(player, 0) + 1) % 5 == 0 and normal + 1 <= ceiling:
+            bands.append((BAND_ORDER[normal + 1], "aspirational"))
+        if normal <= ceiling and normal < len(BAND_ORDER):
+            bands.append((BAND_ORDER[normal], "long_term"))
+    for selected_band, mode in bands:
+        candidates = []
+        for item, definition in QUEST_CATALOG.items():
+            if item in reserved or definition["band"] != selected_band:
                 continue
-            if lane == "private" and not observed and not owned:
+            if (warmup or selected_band == "spawn_local") and (
+                    not snapshot.complete or type(snapshot.items.get(item)) is not int
+                    or snapshot.items[item] < definition["min"]):
                 continue
-        candidates.append({"item": item, "min": definition["min"], "max": definition["max"],
-                           "band": band, "sources": sorted(sources)})
-    return candidates
+            candidates.append({
+                "item": item, "min": definition["min"],
+                "max": definition["min"] if warmup else definition["max"],
+                "band": selected_band, "sources": sorted(snapshot.sources.get(item, set())),
+                "mode": mode, "reference_band": reference,
+            })
+        if candidates:
+            return candidates
+    return []
 
 
 def average_strength(profiles: dict[str, PlayerProfile]) -> int:
@@ -606,7 +704,96 @@ def _clear_quest_lane(state: State, quest: Quest) -> None:
         state.active_quest = None
 
 
+def revalidate_legacy_quests(state: State, *, profiles: dict[str, PlayerProfile] | None = None,
+                             snapshots: dict[bool, SupplySnapshot] | None = None) -> set[str]:
+    """Retire only untouched, provably invalid work; return suspended quest IDs."""
+    pending_ids = {entry.quest.quest_id for entry in state.pending_settlement_rewards}
+    occupied = {entry.quest.item: entry.quest.quest_id for entry in state.pending_settlement_rewards}
+    # Resolve reliable record-level conflicts before supply filtering, so a later
+    # duplicate cannot make its higher-priority communal winner appear invalid.
+    for quest in active_quests(state):
+        if quest.quest_id in pending_ids:
+            continue
+        winner = occupied.setdefault(quest.item, quest.quest_id)
+        if winner != quest.quest_id and quest.policy_version != QUEST_POLICY_VERSION and not DRY_RUN:
+            _clear_quest_lane(state, quest)
+            save_state(state)
+            announce(f"Retired {quest.title!r}: {quest.item} is reserved by an earlier quest or pending operation. "
+                     "No offerings consumed, rewards granted, or completions counted.")
+    occupied = {entry.quest.item: entry.quest.quest_id for entry in state.pending_settlement_rewards}
+    suspended = set()
+    profiles = profiles if profiles is not None else {}
+    snapshots = dict(snapshots) if snapshots is not None else {}
+    group_score = average_strength(profiles)
+    for quest in active_quests(state):
+        if quest.quest_id in pending_ids:
+            continue
+        conflict = quest.item in occupied and occupied[quest.item] != quest.quest_id
+        occupied.setdefault(quest.item, quest.quest_id)
+        if quest.policy_version == QUEST_POLICY_VERSION:
+            continue
+        candidate = None
+        reason = "its item is reserved by an earlier quest or pending operation"
+        if not conflict:
+            lane = "communal" if quest.lane == "communal" else "private"
+            warmup = lane_warmup(state, lane, quest.player)
+            profile = profiles.get(quest.player)
+            if not warmup and lane == "private" and (
+                    profile is None or profile.confidence != "complete"):
+                suspended.add(quest.quest_id)
+                continue
+            if not warmup and (not profiles or any(p.confidence != "complete" for p in profiles.values())):
+                suspended.add(quest.quest_id)
+                continue
+            if warmup not in snapshots:
+                try:
+                    snapshots[warmup] = supply_snapshot(warmup=warmup)
+                except (OSError, RconError, ValueError):
+                    snapshots[warmup] = SupplySnapshot({}, {}, False, "observation unavailable")
+            snapshot = snapshots[warmup]
+            if not snapshot.complete:
+                suspended.add(quest.quest_id)
+                continue
+            if profile is None and lane == "private":
+                profile = build_profile(quest.player, 0, {}, {}, {}, confidence="limited")
+            candidates = candidate_items(
+                lane, profile, snapshot, group_score if lane == "communal" else profile.score,
+                state=state, communal_score=group_score, exclude_id=quest.quest_id)
+            candidate = next((entry for entry in candidates if entry["item"] == quest.item
+                              and entry["min"] <= quest.quantity <= entry["max"]), None)
+            reason = ("it does not meet the verified nearby warm-up catalog-minimum policy"
+                      if warmup else "it does not meet the progression-safe personal/communal policy")
+        if candidate is None:
+            suspended.add(quest.quest_id)
+            if DRY_RUN:
+                continue
+            _clear_quest_lane(state, quest)
+            save_state(state)
+            announce(f"Retired {quest.title!r} for {'the group' if quest.lane == 'communal' else quest.player}: "
+                     f"{reason}. No offerings were consumed, rewards granted, or completions counted.")
+        elif not DRY_RUN:
+            quest.policy_version = QUEST_POLICY_VERSION
+            quest.mode = candidate["mode"]
+            quest.reference_band = candidate["reference_band"]
+            quest.candidate_band = candidate["band"]
+            save_state(state)
+    return suspended
+
+
+def completion_allowed(state: State, quest: Quest) -> bool:
+    if quest.policy_version != QUEST_POLICY_VERSION:
+        profiles = profiles_for(online_players())
+        if quest.quest_id in revalidate_legacy_quests(state, profiles=profiles):
+            return False
+    return (any(active.quest_id == quest.quest_id for active in active_quests(state))
+            and quest.item not in reserved_items(state, exclude_id=quest.quest_id))
+
+
 def complete_quest(state: State, quest: Quest, manager=None) -> list[dict]:
+    if any(entry.quest.quest_id == quest.quest_id for entry in state.pending_settlement_rewards):
+        return complete_settlement_quest(state, quest, manager)
+    if not completion_allowed(state, quest):
+        return []
     try:
         slots = source_slots(quest)
     except (OSError, RconError, ValueError) as exc:
@@ -641,9 +828,13 @@ def vanilla_commands(pending: PendingReward) -> list[str]:
 
 
 def complete_settlement_quest(state: State, quest: Quest, manager, slots: list[dict] | None = None) -> list[dict]:
+    if DRY_RUN:
+        return []
     pending = next((entry for entry in state.pending_settlement_rewards
                     if entry.quest.quest_id == quest.quest_id), None)
     if pending is None:
+        if not completion_allowed(state, quest):
+            return []
         slots = source_slots(quest) if slots is None else slots
         commands = offering_source_commands(quest, slots)
         recipients = (online_players() if quest.lane == "communal" else [quest.player])
@@ -660,6 +851,9 @@ def complete_settlement_quest(state: State, quest: Quest, manager, slots: list[d
     if pending.consumption == "done":
         return process_pending_rewards(state, manager)
     if pending.consumption == "uncertain":
+        return []
+    if any(entry.quest.quest_id != quest.quest_id and entry.quest.item == quest.item
+           for entry in state.pending_settlement_rewards):
         return []
     # Persist a prepared intent, then mark each external mutation uncertain before
     # dispatch. An unknown response is never replayed automatically.
@@ -742,8 +936,20 @@ def process_pending_rewards(state: State, manager) -> list[dict]:
                     raise ValueError("Settlement placement was not accepted")
                 pending.structures_done += 1
                 save_state(state)
-            if not pending.vanilla_uncertain and pending.vanilla_step == len(vanilla_commands(pending)) and (
-                    manager is None or pending.structures_done == len(structures)):
+            vanilla_done = (not pending.vanilla_uncertain
+                            and pending.vanilla_step == len(vanilla_commands(pending)))
+            xp_required = any(reward["type"] == "settlement_xp" and reward["amount"]
+                              for reward in quest.rewards)
+            obligations_done = (pending.structures_done == len(structures)
+                                and (not xp_required or pending.xp_done)
+                                and (manager is None or pending.recorded))
+            if vanilla_done and obligations_done:
+                if quest.lane == "communal":
+                    state.communal_completions = min(3, state.communal_completions + 1)
+                else:
+                    state.private_completions[quest.player] = min(
+                        3, state.private_completions.get(quest.player, 0) + 1)
+                _clear_quest_lane(state, quest)
                 state.pending_settlement_rewards.remove(pending)
                 save_state(state)
         except Exception as exc:
@@ -832,36 +1038,31 @@ def strip_code_fence(text: str) -> str:
 
 def _candidate_map(candidates: list[dict] | None) -> dict[str, dict]:
     if candidates is None:
-        return {item: {"item": item, "min": limits[0], "max": limits[1],
-                       "band": QUEST_CATALOG[item]["band"], "sources": []}
-                for item, limits in ALLOWED_ITEMS.items()}
+        raise ValueError("policy-constrained quest candidates are required")
     return {candidate["item"]: candidate for candidate in candidates}
 
 
 def validate_quest(raw: dict, players: list[str], manager=None, offered_rewards=None, *,
-                   lane: str = "private", candidates: list[dict] | None = None) -> Quest:
+                   lane: str = "private", candidates: list[dict] | None = None,
+                   state: State) -> Quest:
     if lane not in {"private", "communal"}:
         raise ValueError("invalid quest lane")
     if not isinstance(raw, dict) or set(raw) - {
         "player", "item", "quantity", "reward_tier", "title", "announcement", "rewards"
     }:
         raise ValueError("invalid quest JSON keys")
-    if manager is not None:
-        for key in ("quantity", "reward_tier"):
-            if key in raw and type(raw[key]) is not int:
-                raise ValueError(f"{key} must be an integer")
+    for key in ("quantity", "reward_tier"):
+        if key in raw and type(raw[key]) is not int:
+            raise ValueError(f"{key} must be an integer")
     player = COMMUNAL_PLAYER if lane == "communal" else str(raw.get("player", ""))
     item = str(raw.get("item", ""))
     title = str(raw.get("title", "A Small Favour"))[:60]
-    announcement = str(raw.get("announcement", "Bring the requested offering to the shared temple offering chest."))[:220]
-    if "offering chest" not in announcement.lower():
-        announcement = (announcement.rstrip(".!?") + ". Deposit it in the shared temple offering chest.")[:220]
 
     if lane == "private" and (player not in players or not PLAYER_RE.fullmatch(player)):
         raise ValueError("LLM selected an invalid/offline player")
     candidate = _candidate_map(candidates).get(item)
-    if candidate is None:
-        raise ValueError("LLM selected an unavailable item")
+    if candidate is None or item in reserved_items(state):
+        raise ValueError("LLM selected an unavailable or reserved item")
 
     low, high = candidate["min"], candidate["max"]
     quantity = int(raw.get("quantity", low))
@@ -885,39 +1086,138 @@ def validate_quest(raw: dict, players: list[str], manager=None, offered_rewards=
     rewards.extend(reward for reward in requested if reward["type"] == "structure")
     submission = "offering_chest"
     return Quest(player=player, item=item, quantity=quantity, reward_tier=reward_tier,
-                 title=title, announcement=announcement, created_at=time.time(), rewards=rewards,
+                 title=title, announcement=quest_announcement(player, item, quantity, candidate["mode"]),
+                 created_at=time.time(), rewards=rewards,
                  lane=lane, candidate_band=candidate["band"], submission=submission,
-                 availability=list(candidate.get("sources", [])))
+                 availability=list(candidate.get("sources", [])), policy_version=QUEST_POLICY_VERSION,
+                 mode=candidate["mode"], reference_band=candidate["reference_band"])
 
 
 def fallback_quest(players: list[str], manager=None, *, lane: str = "private",
-                   candidates: list[dict] | None = None) -> Quest:
-    """Deterministic policy fallback constrained by the same candidate list as the LLM."""
+                   candidates: list[dict] | None = None, state: State) -> Quest:
+    """Code-owned fallback constrained by the same candidate list as the LLM."""
     if lane == "private" and not players:
         raise ValueError("private quest requires an online player")
-    available = candidates if candidates is not None else list(_candidate_map(None).values())
+    reserved = reserved_items(state)
+    available = [entry for entry in _candidate_map(candidates).values() if entry["item"] not in reserved]
     if not available:
         raise ValueError("no quest candidates available")
     candidate = random.choice(available)
     item, low, high = candidate["item"], candidate["min"], candidate["max"]
     quantity = random.randint(low, min(high, low + 5))
     player = random.choice(players) if lane == "private" else COMMUNAL_PLAYER
-    pretty_item = item.split(":", 1)[1].replace("_", " ")
     tier = min(3, 1 + BAND_ORDER.index(candidate["band"]) // 2)
     return Quest(player=player, item=item, quantity=quantity, reward_tier=tier,
-                 title="Temple Offering", announcement=(
-                     f"{player}, bring {quantity} {pretty_item} to the shared temple offering chest."),
+                 title="Temple Offering",
+                 announcement=quest_announcement(player, item, quantity, candidate["mode"]),
                  created_at=time.time(), rewards=[reward for reward in configured_rewards(manager, tier)
                  if reward["type"] == "settlement_xp"], lane=lane,
                  candidate_band=candidate["band"], submission="offering_chest",
-                 availability=list(candidate.get("sources", [])))
+                 availability=list(candidate.get("sources", [])), policy_version=QUEST_POLICY_VERSION,
+                 mode=candidate["mode"], reference_band=candidate["reference_band"])
+
+
+def quest_announcement(player: str, item: str, quantity: int, mode: str) -> str:
+    target = "Everyone" if player == COMMUNAL_PLAYER else player
+    label = {"warmup": "Nearby warm-up", "communal": "Communal offering",
+             "long_term": "Longer-term personal goal", "aspirational": "Aspirational longer-term personal goal"}[mode]
+    pretty = item.split(":", 1)[1].replace("_", " ")
+    return f"{target}: {label} — bring {quantity} {pretty} to the shared normal temple offering chest."
+
+
+def assign_quest(state: State, quest: Quest, candidates: list[dict]) -> bool:
+    """Commit only a still-unreserved policy choice, with its issued sequence."""
+    candidate = _candidate_map(candidates).get(quest.item)
+    if lane_warmup(state, quest.lane, quest.player) != (quest.mode == "warmup"):
+        return False
+    if (candidate is None or quest.item in reserved_items(state)
+            or not candidate["min"] <= quest.quantity <= candidate["max"]
+            or quest.policy_version != QUEST_POLICY_VERSION
+            or (quest.mode, quest.reference_band, quest.candidate_band) != (
+                candidate["mode"], candidate["reference_band"], candidate["band"])):
+        return False
+    if quest.lane == "communal":
+        if state.communal_quest is not None:
+            return False
+    elif quest.player in state.private_quests or quest.lane != "private":
+        return False
+    if DRY_RUN:
+        print(f"[DRY_RUN] Would announce: {quest.announcement}")
+        return False
+    now = time.time()
+    if quest.lane == "communal":
+        state.communal_quest = quest
+        state.last_communal_quest_at = now
+    else:
+        state.private_quests[quest.player] = quest
+        state.private_quest_at[quest.player] = now
+        if quest.mode != "warmup":
+            state.private_issued[quest.player] = state.private_issued.get(quest.player, 0) + 1
+    state.last_quest_at = now
+    save_state(state)
+    announce(quest.announcement)
+    return True
+
+
+def schedule_quests(state: State, players: list[str], recent_events: list[str], manager=None, *,
+                    profiles: dict[str, PlayerProfile] | None = None,
+                    snapshots: dict[bool, SupplySnapshot] | None = None) -> list[Quest]:
+    """Communal-first, stable personal scheduling using the same frozen policy."""
+    now = time.time()
+    due = []
+    if state.communal_quest is None and players and now - state.last_communal_quest_at >= QUEST_INTERVAL_SECONDS:
+        due.append(("communal", None))
+    due.extend(("private", player) for player in sorted(set(players))
+               if player not in state.private_quests
+               and now - state.private_quest_at.get(player, 0) >= QUEST_INTERVAL_SECONDS)
+    if not due:
+        return []
+    profiles = profiles if profiles is not None else profiles_for(players)
+    snapshots = dict(snapshots) if snapshots is not None else {}
+    score = average_strength(profiles)
+    assigned = []
+    for lane, player in due:
+        if not DRY_RUN:
+            if lane == "communal":
+                state.last_communal_quest_at = now
+            else:
+                state.private_quest_at[player] = now
+        profile = profiles.get(player) if player else None
+        if lane == "private" and profile is None:
+            continue
+        warmup = lane_warmup(state, lane, player)
+        if warmup not in snapshots:
+            snapshots[warmup] = supply_snapshot(warmup=warmup)
+        snapshot = snapshots[warmup]
+        strength = score if lane == "communal" else profile.score
+        candidates = candidate_items(lane, profile, snapshot, strength,
+                                     state=state, communal_score=score)
+        if not candidates:
+            print(f"[QUEST] {lane} lane declined for {player or 'the group'}: no safe unreserved candidates")
+            continue
+        targets = players if lane == "communal" else [player]
+        try:
+            quest = make_quest_with_llm(targets, recent_events, manager, lane=lane,
+                                       candidates=candidates, strength=strength, state=state)
+        except Exception as exc:
+            print(f"[WARN] {lane} LLM quest generation failed: {exc}")
+            try:
+                quest = fallback_quest(targets, manager, lane=lane, candidates=candidates, state=state)
+            except ValueError:
+                continue
+        # Model latency may leave the original candidate list stale.
+        current = candidate_items(lane, profile, snapshot, strength,
+                                  state=state, communal_score=score)
+        if assign_quest(state, quest, current):
+            assigned.append(quest)
+    return assigned
 
 
 def make_quest_with_llm(players: list[str], recent_events: list[str], manager=None, *,
                         lane: str = "private", candidates: list[dict] | None = None,
-                        strength: int = 0) -> Quest:
+                        strength: int = 0, state: State) -> Quest:
     if DEMO_MODE:
-        return fallback_quest(players, manager, lane=lane, candidates=candidates)
+        return fallback_quest(players, manager, lane=lane, candidates=candidates, state=state)
     if not (LLM_URL and LLM_MODEL):
         raise RuntimeError("Set LLM_URL and LLM_MODEL, or set DEMO_MODE=1")
     candidate_map = _candidate_map(candidates)
@@ -943,7 +1243,7 @@ def make_quest_with_llm(players: list[str], recent_events: list[str], manager=No
         user["settlement_context"] = compact_settlement_context(manager)
         user["configured_reward_choices"] = offered_rewards
     raw = request_llm_json(system, user)
-    return validate_quest(raw, players, manager, offered_rewards, lane=lane, candidates=candidates)
+    return validate_quest(raw, players, manager, offered_rewards, lane=lane, candidates=candidates, state=state)
 
 
 def request_llm_json(system: str, user: dict):
@@ -1069,86 +1369,17 @@ def main() -> int:
                         print(f"[SETTLEMENT] {json.dumps(event)}")
                         if event["type"] in ("settlement_level_up", "construction_complete"):
                             decision_events.append(event)
-                    decision_events.extend(process_pending_rewards(state, manager))
+                decision_events.extend(process_pending_rewards(state, manager))
                 players = online_players()
-                # Legacy active_quest is retained for state compatibility, but the
-                # lane maps are authoritative after load/migration.
-                if state.active_quest and state.active_quest.quest_id not in {
-                        quest.quest_id for quest in state.private_quests.values()} | ({
-                            state.communal_quest.quest_id} if state.communal_quest else set()):
-                    if state.active_quest.player in players:
-                        if items_in_source(state.active_quest) >= state.active_quest.quantity:
-                            decision_events.extend(complete_quest(state, state.active_quest, manager))
-                    else:
-                        state.active_quest = None
-                        save_state(state)
-
-                if state.communal_quest and items_in_source(state.communal_quest) >= state.communal_quest.quantity:
-                    print(f"[QUEST] Communal completion detected: {state.communal_quest.item}")
-                    decision_events.extend(complete_quest(state, state.communal_quest, manager))
-                for player, quest in list(state.private_quests.items()):
-                    if player in players and items_in_source(quest) >= quest.quantity:
-                        print(f"[QUEST] Private completion detected: {player} submitted {quest.item}")
+                pending_ids = {entry.quest.quest_id for entry in state.pending_settlement_rewards}
+                suspended = set()
+                if any(quest.policy_version != QUEST_POLICY_VERSION and quest.quest_id not in pending_ids
+                       for quest in active_quests(state)):
+                    suspended = revalidate_legacy_quests(state, profiles=profiles_for(players))
+                for quest in active_quests(state):
+                    if quest.quest_id not in suspended and (quest.lane == "communal" or quest.player in players):
                         decision_events.extend(complete_quest(state, quest, manager))
-
-                due_communal = (state.communal_quest is None and players and
-                                 time.time() - state.last_communal_quest_at >= QUEST_INTERVAL_SECONDS)
-                due_private = [player for player in players if player not in state.private_quests and
-                               time.time() - state.private_quest_at.get(player, 0) >= QUEST_INTERVAL_SECONDS]
-                if due_communal or due_private:
-                    profiles = profiles_for(players)
-                    snapshot = supply_snapshot()
-                    if due_communal:
-                        candidates = candidate_items("communal", None, snapshot, average_strength(profiles))
-                        if candidates:
-                            try:
-                                quest = make_quest_with_llm(players, list(recent_events), manager,
-                                                            lane="communal", candidates=candidates,
-                                                            strength=average_strength(profiles))
-                            except Exception as exc:
-                                print(f"[WARN] Communal LLM quest generation failed: {exc}")
-                                try:
-                                    quest = fallback_quest(players, manager, lane="communal", candidates=candidates)
-                                except ValueError as fallback_exc:
-                                    print(f"[QUEST] Communal lane declined: {fallback_exc}")
-                                    quest = None
-                            if quest is None:
-                                state.last_communal_quest_at = time.time()
-                            else:
-                                state.communal_quest = quest
-                                state.last_communal_quest_at = time.time()
-                                state.last_quest_at = state.last_communal_quest_at
-                                if not DRY_RUN:
-                                    save_state(state)
-                                    announce(quest.announcement)
-                                else:
-                                    print(f"[DRY_RUN] Would announce: {quest.announcement}")
-                                print(f"[QUEST] {quest}")
-                        else:
-                            print("[QUEST] Communal lane declined: no safe candidates")
-                            state.last_communal_quest_at = time.time()
-                    for player in due_private:
-                        candidates = candidate_items("private", profiles[player], snapshot, profiles[player].score)
-                        if not candidates:
-                            print(f"[QUEST] Private lane declined for {player}: no safe candidates")
-                            state.private_quest_at[player] = time.time()
-                            continue
-                        try:
-                            quest = make_quest_with_llm([player], list(recent_events), manager,
-                                                        lane="private", candidates=candidates,
-                                                        strength=profiles[player].score)
-                        except Exception as exc:
-                            print(f"[WARN] Private LLM quest generation failed for {player}: {exc}")
-                            quest = fallback_quest([player], manager, lane="private", candidates=candidates)
-                        state.private_quests[player] = quest
-                        state.private_quest_at[player] = time.time()
-                        state.last_quest_at = state.private_quest_at[player]
-                        if not DRY_RUN:
-                            save_state(state)
-                            announce(quest.announcement)
-                        else:
-                            print(f"[DRY_RUN] Would announce: {quest.announcement}")
-                        print(f"[QUEST] {quest}")
+                schedule_quests(state, players, list(recent_events), manager)
 
                 if (manager is not None and players and decision_events and not DEMO_MODE
                         and LLM_URL and LLM_MODEL
