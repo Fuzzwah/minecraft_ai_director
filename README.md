@@ -129,20 +129,69 @@ rewards. Ender-chest, player-inventory, and arbitrary-chest fallbacks are not
 supported. Persisted private quests from the removed ender-chest contract are
 migrated to the shared chest without reading or consuming legacy ender items.
 
-Candidate items are Python-owned. Spawn-local communal items require a complete
-saved Anvil observation of the bounded village area; private local items may also
-be observed in that target's inventories. Higher early, established, Nether/End,
-and endgame bands require bounded progression scores from experience, equipment,
-and owned materials. A missing or malformed signal lowers confidence and cannot
-unlock an advanced band. The LLM and deterministic fallback receive the same
-filtered candidates, and an empty candidate set produces no quest.
+Candidate items are Python-owned. The first **three successfully completed
+communal quests**, and the first **three personal quests per target**, are an
+easy warm-up regardless of player strength. Warm-up uses a **32-block horizontal
+radius** around the configured village quest hub (`SPAWN_X/Z`), not entire
+intersecting chunks or a silently changed Minecraft world spawn.
 
-The quest state contains one durable communal quest and one durable private quest
-per eligible player. Preserve this JSON with the matching world; do not attach it
-to regenerated terrain. The observation and RCON contract targets Java 26.3;
-the settlement construction pack remains a separate Java 1.21–1.21.1 artifact.
+Only verified surface harvestable resources and directly accessible nearby item
+stacks count. Wheat, carrots, and potatoes must have age 7; beetroot must have age
+3. Conservative yields are one item per mature crop or pumpkin and nine wheat
+per hay bale. Whole melon blocks do not prove whole melon item supply, and
+building logs do not become warm-up harvest instructions. For example, six
+mature wheat plants or two nearby pumpkins can support an opening quest; absent
+or immature carrots cannot. Warm-up requests use the catalog minimum exactly and
+never exceed observed supply. Player inventory possession alone cannot replace
+nearby evidence. Missing, unloaded, malformed, or changing observations defer the
+lane instead of widening its radius or inventing resources.
 
-Acceptance evidence: the disposable Java 26.3 server loaded the temple pack before
+Active communal quests, all personal quests (including offline targets), and
+pending offering/reward operations reserve distinct item IDs. New assignments
+respect reservations in both directions. If wheat and pumpkins are already
+reserved and nothing else qualifies, another personal warm-up waits; it does
+not request the same item or jump to harder materials.
+
+After communal warm-up, communal difficulty uses the eligible-player average.
+After personal warm-up, a normal personal goal is one material band above the
+communal reference, but only if that target's own progression unlocks it. Every
+fifth issued post-warm-up personal quest prefers one further unlocked band as a
+longer-term aspirational goal; if none qualifies it uses the normal goal, or
+defers if that pool is also empty. A lucky find can complete a goal without
+already owning the requested material when it is assigned; luck never unlocks
+an otherwise unsafe band. Assigned goals retain their difficulty when group
+membership changes. Later local observations use `SPAWN_SUPPLY_RADIUS`; warm-up
+never uses that wider radius.
+
+The LLM and fallback receive the same filtered candidates and quantity bounds.
+Communal announcements address the group; personal announcements identify the
+target and distinguish nearby warm-up from longer-term goals. Direct rewards
+retain the existing economy and ownership.
+
+The quest JSON durably stores lane completion counts and personal assignment
+sequence independently of settlements. Only fully successful consumption and
+reward completion advances warm-up, exactly once; generation, retirement,
+deferral, failure, uncertainty, and dry-run do not. Counts missing from old saves
+start conservatively at zero, without guessing historical completions.
+Pending settlement XP or structure obligations remain pending while settlement
+integration is disabled; partial vanilla rewards do not count as completion.
+
+**In-place upgrade:** stop the single Director writer and preserve a matched
+world/configuration/quest JSON/SQLite backup before installing reviewed code.
+Keep the current world, world identity, quest hub, and chest coordinates. Before
+completing old-policy active quests, the Director revalidates trustworthy local
+evidence: untouched invalid or colliding quests can be retired with an
+explanation and replaced without consuming offerings or granting rewards.
+Unknown evidence suspends the affected quest rather than declaring its resource
+absent. Pending and uncertain operations remain intact and retain reservations;
+they require the existing recovery/reconciliation process. Accepted old quests
+are revalidated once, not cancelled again after normal harvesting.
+
+Do not regenerate terrain or delete quest state for this update. Preserve JSON
+and SQLite with their matching world, and never restore state against unverified
+inventory changes. Observation and offering commands target Java 26.3.
+
+Earlier temple acceptance evidence: the disposable Java 26.3 server loaded the temple pack before
 first generation, generated supported village roots with the Greek composition,
 one empty normal chest, and no ender chest, placed controlled roots in all four
 rotations, and retained them across a save/restart. RCON verified Java 26.3
@@ -153,6 +202,29 @@ rewards, shared-chest legacy migration, restart persistence, and lost-response
 uncertainty. A rendered client workflow was not verified: the
 cached official client reached Java 26.3 but its authentication token returned
 HTTP 401, so no client joined the offline acceptance server.
+
+Warm-up acceptance on an isolated Java 26.3 server: independent RCON block checks
+and the saved-world observer agreed on six mature wheat and three exposed
+pumpkins within 32 blocks; immature carrots, a pumpkin at distance 33, and a
+buried pumpkin were excluded. Real same-cycle selection assigned two pumpkins
+to the group and six wheat to the player, using distinct item IDs. Both quests
+completed against the actual shared chest, preserved an unrelated five-stick
+stack, and granted the connected player four experience levels. Minecraft and
+the actual Director loop were restarted: both completion counters remained one,
+the player's saved levels remained four, and an injected lost-consumption reply
+left its exact uncertain record protected without replay. Migration of a copy
+of existing quest state retired the old carrot/building-log assignments without
+count credit and preserved unrelated inventory, SQLite identity, and recovery
+debt. No production rollout or world regeneration was performed for this proof.
+
+The existing official client rendered the disposable farm and distinct
+group/target warm-up announcements; inspected screenshots remain under ignored
+`.runtime/warmup-client-game/`. This connection used only the isolated server's
+offline mode. A separate cached-token session-authentication attempt returned
+HTTP 403, so authenticated production joining, village walking access, and
+harvesting there remain unverified. Copied production village data no longer
+produced phantom carrots; its verified local wheat yield was below the opening
+minimum, which correctly defers assignment rather than fabricating supply.
 
 ## Safely enable settlements
 
