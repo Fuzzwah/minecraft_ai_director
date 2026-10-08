@@ -29,20 +29,21 @@ and `mc_ai_director_default_state`; RCON is not published on the host.
 The separate hardcore server uses port 25567.
 
 Matched rollback snapshots are stored under `/home/fuz/mc-ai-director-backups/`
-with a checksum manifest. Take a fresh snapshot immediately before the future
-regeneration if the existing world has been played since its last backup.
+with checksum manifests. Take a fresh stopped-generation snapshot before every
+world replacement; an older snapshot may predate player or Director changes.
 
-**Village-temple deployment requires regenerating this live world**, but only
-after the generation feature is implemented and verified for Java 26.3.
-Preserve both existing volumes as a rollback snapshot before regeneration.
-Install the generation datapack before creating the replacement world; use fresh
-Director state, recompute spawn, and verify generated temples before playtesting.
-The existing construction templates alone do not add temples to vanilla villages.
+The landmark temple release is deployed; the operator-authorized regeneration
+and current coordinates are recorded below. Future world replacement still
+requires reviewed, merged Java 26.3 assets and explicit destructive-cutover
+authorization. Install the generation pack before the replacement world's first
+terrain generation. Settlement construction templates alone do not add village
+temples.
 
 Regeneration is a destructive cutover. Stop the Director writer first, flush and
 snapshot the complete Minecraft and Director volumes as one matched pair, then
-create a new random-seed world with the verified Java 26.3 temple pack already
-installed. Provision a new quest JSON, settlement database, and settlement
+create the replacement world with the verified Java 26.3 temple pack already
+installed. Retain the current seed unless a different seed is explicitly chosen.
+Use fresh quest state and, if settlements are enabled, a fresh database and stable
 `world_id`; never reuse old records with new terrain. If any placement, spawn,
 container, Director, persistence, or uncertainty check fails, stop both writers
 and restore the matched snapshot instead of retrying or mixing state.
@@ -75,14 +76,15 @@ podman exec mc_ai_director_default rcon-cli 'setworldspawn <x> <y> <z>'
 podman exec mc_ai_director_default rcon-cli 'save-all flush'
 ```
 
-For the current regenerated live world, the nearest result is the plains village
-at `[352, ~, -832]`. Its verified support is
-`[352, 73, -832] = minecraft:smooth_stone`, with clear air at `[352, 74, -832]`,
-so the persisted world spawn is `[352, 74, -832]`. This changes only the
-default world spawn. Beds and respawn anchors remain authoritative for players
-who have set them. The Director's quest/turn-in coordinates
-(`SPAWN_X`, `SPAWN_Y`, `SPAWN_Z`) are a separate contract and are not changed by
-this world-spawn adjustment.
+The current regenerated world's nearest village is plains at `[64, ~, 288]`.
+Its landmark root spans `[64, 86, 288]` through `[88, 105, 312]`. The verified
+entrance has `minecraft:cut_sandstone` at `[76, 89, 298]` and two clear air blocks
+above it; persisted world spawn and the Director quest hub are **`[76, 90, 298]`**.
+The single empty normal offering chest is **`[76, 90, 304]`**. These Director
+coordinates were configured separately after inspecting the generated structure.
+`minecraft:respawn_radius=0` keeps initial/default respawns at the verified
+entrance instead of scattering players onto roofs or obelisks. Player-set beds
+and respawn anchors remain authoritative.
 
 ## Run the existing Director
 
@@ -275,12 +277,11 @@ python3 -B tools/village_temples.py --archive /path/to/server-26.3-core.jar
 python3 -B tools/village_temples.py --check
 ```
 
-This is a **generation-asset change, not a live-world retrofit**. Existing
-temples, the configured offering chest, quest state, and settlement starter
-templates are untouched. Installing the reviewed pack affects newly generated
-village starts only. Replacing an existing temple needs a separately planned,
-backed-up world edit; do not regenerate the player world or move the Director's
-chest coordinates merely to apply this visual redesign.
+Installing this datapack alone affects **new village starts**, not already
+generated temples, quest state, or settlement starter templates. Retrofitting an
+existing temple or replacing a whole player world requires separate authorization
+and matched backups. The explicitly authorized full-world replacement below is
+separate from the asset change.
 
 Isolated Java 26.3 verification generated villages in all five styles with
 downstream vanilla pieces. An official vanilla client rendered the landmark,
@@ -289,8 +290,31 @@ its empty offering chest. The final template's non-air palette states passed
 real-server checks in all four rotations, and the final naturally generated
 stairs, hanging lights, and empty chest survived a server restart. These checks
 used a loopback-only offline test server, not an authenticated production
-session. Preview captures are retained under ignored `.runtime/landmark-smoke/`;
-no production rollout was performed.
+session. Preview captures are retained under ignored `.runtime/landmark-smoke/`.
+
+**Current live rollout:** [PR #12](https://github.com/Fuzzwah/minecraft_ai_director/pull/12)
+was merged as `6d86fa0cfc5407f66e1f8741872189fdf2e26c11` and installed from primary
+`main`. Complete stopped-generation data, state, and configuration archives,
+verified checksums, the retained old world, and `deployment.json` are private under
+`/home/fuz/mc-ai-director-backups/live-landmark-regeneration-20261008T221528Z/`.
+The new generation identity is `live-landmark-d6d2dc04-701d-4f20-ad57-a1a98e4aa00c`.
+The seed `-7461930528814073291`, generator, survival/normal settings, online
+authentication, access-list contents, and secret references were retained.
+Quest state is fresh; settlements remain disabled and no old database was attached.
+
+Live acceptance verified the enabled pack, a 103-piece naturally assembled
+plains village, 2,369 architectural cells, supported paths from all roads to the
+altar/chest, clear chest-lid space, and the safe spawn above. The writer-stopped
+Director preview authenticated over private RCON, read the empty chest, and found
+54 wheat-equivalent units of verified local supply supporting a six-wheat opening
+quest without changing quest JSON. The final temple, spawn, seed, and fresh state
+survived a save/restart. The public endpoint reported Java 26.3/protocol 777;
+both Minecraft and the single Keeper writer were healthy after reopening.
+Native idle pausing is disabled (`pause-when-empty-seconds=-1`) so loaded temple
+and supply probes remain usable without players. Authenticated production client
+joining was not exercised; client rendering/access proof remains the isolated
+vanilla session described above. Unrelated servers and reconciliation snapshots
+were not changed.
 
 ## Safely enable settlements
 
