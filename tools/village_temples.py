@@ -3,11 +3,10 @@
 python3 -B tools/village_temples.py --archive /path/to/server-26.3.jar
 python3 -B tools/village_temples.py --check
 
-The recipes deliberately replace each decorative centerpiece with a compact
-Greek-inspired temple, retaining the vanilla root anchor and all jigsaws. The
-composition is generated per trusted root so the smallest vanilla footprints
-still receive the same structural identity. This is development tooling, never
-a running-world mutation mechanism.
+The recipes replace each decorative centerpiece with a sandstone landmark on a
+25-block plaza. Road jigsaws move to the corresponding outer edge without
+changing their height, orientation, pools, or final states. This is development
+tooling, never a running-world mutation mechanism.
 """
 
 import argparse
@@ -28,21 +27,20 @@ DEFAULT_OUTPUT = BASE / "datapack/director_village_temples"
 RECIPES = Path(__file__).with_name("village_temple_recipes.json")
 ARCHIVE_SHA256 = "a362163eec5d1612d520772bc16e5b39c09e3b234fdc045f56bf544284ee8ae6"
 STYLES = ("plains", "desert", "savanna", "snowy", "taiga")
-MATERIALS = {
-    "plains": {"column": "stripped_oak_wood", "wall": "stripped_oak_wood", "roof": "stripped_oak_wood"},
-    "desert": {"column": "sandstone", "wall": "sandstone", "roof": "sandstone"},
-    "savanna": {"column": "stripped_acacia_log", "wall": "stripped_acacia_wood", "roof": "stripped_acacia_wood"},
-    "snowy": {"column": "stripped_spruce_log", "wall": "stripped_spruce_wood", "roof": "snow_block"},
-    "taiga": {"column": "stripped_spruce_log", "wall": "stripped_spruce_wood", "roof": "stripped_spruce_wood"},
-}
-FOUNDATION = "minecraft:smooth_stone"
+MATERIALS = {style: {"column": "sandstone", "wall": "smooth_sandstone",
+                     "roof": "cut_sandstone"} for style in STYLES}
+# Desert abandonment replaces smooth/cut sandstone with cobwebs. Use the
+# unaffected carved/base sandstone family there, without altering processors.
+MATERIALS["desert"] = {"column": "sandstone", "wall": "sandstone", "roof": "sandstone"}
+DESERT_STONE = {"smooth_sandstone": "sandstone", "cut_sandstone": "sandstone",
+                "smooth_sandstone_stairs": "sandstone_stairs",
+                "smooth_sandstone_slab": "sandstone_slab"}
 ALTAR_BASE = "minecraft:chiseled_stone_bricks"
 ALTAR_TOP = {"id": "minecraft:smooth_stone_slab", "properties": {"type": "top", "waterlogged": "false"}}
 CONTAINER_IDS = {"offering_chest": "minecraft:chest"}
-CONTAINER_OFFSETS = {"offering_chest": (1, 1, 2)}
 CONTAINER_STATES = {
     "offering_chest": {"id": "minecraft:chest",
-                       "properties": {"waterlogged": "false", "facing": "south", "type": "single"}},
+                       "properties": {"waterlogged": "false", "facing": "north", "type": "single"}},
 }
 PACK_META = {"pack": {"description": "Keeper temples in every vanilla village — Java 26.3 only",
                        "min_format": [121, 0], "max_format": [121, 0]}}
@@ -52,6 +50,8 @@ SOLID = {"minecraft:smooth_stone", "minecraft:chiseled_stone_bricks", "minecraft
          "minecraft:stripped_acacia_log", "minecraft:stripped_acacia_wood", "minecraft:stripped_spruce_log",
          "minecraft:stripped_spruce_wood", "minecraft:snow_block", "minecraft:dirt_path",
          "minecraft:grass_block", "minecraft:cobblestone", "minecraft:sand", "minecraft:mossy_cobblestone"}
+SOLID |= {"minecraft:cut_sandstone", "minecraft:chiseled_sandstone",
+          "minecraft:gold_block", "minecraft:glowstone", "minecraft:stone_bricks"}
 
 
 def json_bytes(value):
@@ -113,138 +113,125 @@ def rotated_state(state, turns):
     return state
 
 
-def reachable(blocks, start, floor):
+def reachable(blocks, start):
+    """Conservative two-block clearance, with directed half-block stair access.
+
+    Nodes are feet positions above full cubes or bottom stairs. Ascending onto
+    stairs is allowed only through the low face; full-block jumping is not a
+    substitute for a usable staircase.
+    """
+    directions = {"north": (0, -1), "east": (1, 0), "south": (0, 1), "west": (-1, 0)}
+
     def walkable(p):
-        x, z = p
-        return (blocks.get((x, floor, z), {}).get("id") in SOLID
-                and all(blocks.get((x, floor + h, z), {}).get("id") in PASSABLE for h in (1, 2)))
+        x, y, z = p
+        support = blocks.get((x, y - 1, z), {})
+        return (support.get("id") in SOLID or (
+            support.get("id", "").endswith("_stairs")
+            and support.get("properties", {}).get("half") == "bottom")) and all(
+                blocks.get((x, y + h, z), {}).get("id") in PASSABLE for h in (0, 1))
+
+    start = tuple(start)
     if not walkable(start):
         return set()
-    found = {start}
-    queue = deque([start])
+    found, queue = {start}, deque([start])
     while queue:
-        x, z = queue.popleft()
-        for point in ((x - 1, z), (x + 1, z), (x, z - 1), (x, z + 1)):
-            if point not in found and walkable(point):
+        x, y, z = queue.popleft()
+        for dx, dz in directions.values():
+            for dy in (-1, 0, 1):
+                point = (x + dx, y + dy, z + dz)
+                if point in found or not walkable(point):
+                    continue
+                if dy:
+                    upper = point if dy > 0 else (x, y, z)
+                    support = blocks.get((upper[0], upper[1] - 1, upper[2]), {})
+                    facing = support.get("properties", {}).get("facing")
+                    uphill = (dx, dz) if dy > 0 else (-dx, -dz)
+                    if not support.get("id", "").endswith("_stairs") or directions.get(facing) != uphill:
+                        continue
+                    lower = (x, y, z) if dy > 0 else point
+                    if blocks.get((lower[0], lower[1] + 2, lower[2]), {}).get("id") not in PASSABLE:
+                        continue
                 found.add(point)
                 queue.append(point)
     return found
 
 
 def validate_root(root, record, *, rotations=range(4)):
-    """Consumer-visible Greek composition and jigsaw checks."""
+    """Validate landmark geometry, chest usability, and every road-to-altar route."""
     size = root["size"]
+    floor = record["floor_y"]
     if root.get("DataVersion") != 5023 or root.get("entities"):
         raise ValueError("Wrong DataVersion or embedded entities")
-    if list(size)[::2] != record["source_size"][::2] or size[1] < record["source_size"][1]:
-        raise ValueError("Changed root footprint or lowered vertical extent")
+    if list(size) != [25, floor + 20, 25]:
+        raise ValueError("Changed landmark bounds")
     original = record["source_jigsaws"]
-    current = [joint_record(root, b) for b in joints(root)]
     expected = copy.deepcopy(original)
     for adjustment in record["connector_adjustments"]:
-        expected[adjustment["index"]]["pos"] = adjustment["to"]
+        index = adjustment["index"]
+        if adjustment["from"] != original[index]["pos"]:
+            raise ValueError("Invalid jigsaw relocation provenance")
+        expected[index]["pos"] = adjustment["to"]
+    for source, joint in zip(original, expected):
+        if source["nbt"]["pool"].endswith("/streets"):
+            if joint["pos"] != road_position(source, record["source_size"]):
+                raise ValueError("Road jigsaw must face outward at the expanded plaza edge")
+    current = [joint_record(root, b) for b in joints(root)]
     if sorted(current, key=lambda b: tuple(b["pos"])) != sorted(expected, key=lambda b: tuple(b["pos"])):
-        raise ValueError("Lost/changed trusted jigsaw metadata or road position")
+        raise ValueError("Lost/changed trusted jigsaw metadata or position")
     entries = {tuple(block["pos"]): block for block in root["blocks"]}
+    if len(entries) != size[0] * size[1] * size[2] or len(entries) != len(root["blocks"]):
+        raise ValueError("Missing explicit entry/volume clearance or duplicate blocks")
     for block in root["blocks"]:
         if any(p < 0 or p >= limit for p, limit in zip(block["pos"], size)):
             raise ValueError("Block outside root bounds")
         block_id = root["palette"][block["state"]]["id"]
         if "nbt" in block and block_id not in {"minecraft:jigsaw", *CONTAINER_IDS.values()}:
             raise ValueError("Unexpected block entity payload")
-        if block_id in CONTAINER_IDS.values() and "nbt" not in block:
-            raise ValueError("Container is missing block entity payload")
     blocks = block_map(root)
-    floor = record["floor_y"]
     containers = {name: tuple(position) for name, position in record["containers"].items()}
-    expected_container_positions = set(containers.values())
-    seen_container_positions = {position for position, state in blocks.items()
-                                if state["id"] in CONTAINER_IDS.values()}
-    if seen_container_positions != expected_container_positions or set(containers) != {"offering_chest"}:
+    actual = {p for p, state in blocks.items() if state["id"] in {*CONTAINER_IDS.values(), "minecraft:ender_chest"}}
+    if set(containers) != {"offering_chest"} or actual != set(containers.values()):
         raise ValueError("Expected exactly one normal offering chest and no ender chest")
     for name, position in containers.items():
-        block = entries.get(position)
-        state = blocks.get(position, {})
-        if state.get("id") != CONTAINER_IDS[name] or block is None:
-            raise ValueError(f"Invalid {name} position or block")
-        payload = block.get("nbt", {})
-        if payload.get("id") != CONTAINER_IDS[name]:
-            raise ValueError(f"Invalid {name} block entity ID")
-        if "Items" not in payload or len(payload["Items"]) != 0 or "LootTable" in payload:
+        payload = entries[position].get("nbt", {})
+        if blocks[position] != CONTAINER_STATES[name] or payload.get("id") != CONTAINER_IDS[name]:
+            raise ValueError("Invalid offering chest state or block entity")
+        if "Items" not in payload or payload["Items"] or "LootTable" in payload:
             raise ValueError("Offering chest must start empty without a loot table")
+        if blocks.get((position[0], position[1] + 1, position[2]), {}).get("id") != "minecraft:air":
+            raise ValueError("Offering chest lid is obstructed")
     ax, ay, az = record["altar"]["base"]
     if sum(state["id"] == ALTAR_BASE for state in blocks.values()) != 1:
         raise ValueError("Expected exactly one Keeper altar")
     if blocks.get((ax, ay, az), {}).get("id") != ALTAR_BASE or blocks.get((ax, ay + 1, az)) != ALTAR_TOP:
         raise ValueError("Altar identity/position changed")
-    x0, z0 = record["room_min"]
-    materials = MATERIALS[record["style"]]
-    wall = "minecraft:" + materials["wall"]
-    column = "minecraft:" + materials["column"]
-    roof = "minecraft:" + materials["roof"]
-    entry = tuple(record["entry"])
-    greek = record["greek"]
-    foundation = {tuple(position) for position in greek["foundation"]}
-    columns = {tuple(position) for position in greek["columns"]}
-    pediment = {tuple(position) for position in greek["pediment"]}
-    for position in foundation:
-        if blocks.get(position, {}).get("id") != FOUNDATION:
-            raise ValueError("Greek stepped foundation is incomplete")
-    for position in columns:
-        if blocks.get(position, {}).get("id") != column:
-            raise ValueError("Greek column rhythm is incomplete")
-    for position in pediment:
-        if blocks.get(position, {}).get("id") != roof:
-            raise ValueError("Greek pediment is incomplete")
-    if len(columns) < 6 or len(pediment) < 4:
-        raise ValueError("Greek composition is too small")
-    for x in range(x0, x0 + 5):
-        for z in range(z0, z0 + 5):
-            if blocks.get((x, floor + 4, z), {}).get("id") != roof:
-                raise ValueError("Incomplete solid roof or wrong biome material")
-            if x in (x0, x0 + 4) or z in (z0, z0 + 4):
-                for y in range(floor + 1, floor + 4):
-                    position = (x, y, z)
-                    if (x, z) == (entry[0], entry[2]) and y in (entry[1], entry[1] + 1):
-                        continue
-                    expected_state = column if position in columns else (
-                        FOUNDATION if position in foundation and y == floor + 1 else wall)
-                    if blocks.get(position, {}).get("id") != expected_state:
-                        raise ValueError("Incomplete Greek temple shell")
+    for feature, cells in record["features"].items():
+        for cell in cells:
+            if blocks.get(tuple(cell["pos"])) != cell["state"]:
+                raise ValueError(f"Incomplete landmark {feature}")
+    # Entire terrace and plaza are supported, not only the selected walking path.
+    for x in range(25):
+        for z in range(25):
             for y in range(floor + 1):
                 if blocks.get((x, y, z), {}).get("id") not in SOLID:
                     raise ValueError("Unsupported temple floor")
-    for x in range(x0 + 1, x0 + 4):
-        for z in range(z0 + 1, z0 + 4):
-            for y in range(floor + 1, floor + 4):
-                position = (x, y, z)
-                if (x, z) == (ax, az) and y in (ay, ay + 1):
-                    continue
-                if position in expected_container_positions:
-                    continue
-                if blocks.get(position, {}).get("id") != "minecraft:air":
-                    raise ValueError("Interior requires explicit air clearance")
-    for h in (0, 1):
-        if blocks.get((entry[0], entry[1] + h, entry[2]), {}).get("id") != "minecraft:air":
-            raise ValueError("Obstructed entry or missing explicit entry air")
-    approach = tuple(record["altar"]["approach"])
-    roads = [tuple(item["pos"]) for item in original if item["nbt"]["pool"].endswith("/streets")]
+    entry = tuple(record["entry"])
+    for p in (entry, tuple(record["altar"]["approach"]), tuple(record["chest_approach"])):
+        if any(blocks.get((p[0], p[1] + h, p[2]), {}).get("id") != "minecraft:air" for h in (0, 1)):
+            raise ValueError("Obstructed entry or interior explicit air clearance")
+    roads = [tuple(j["pos"]) for j in expected if j["nbt"]["pool"].endswith("/streets")]
+    rotations = tuple(rotations)
     for turns in rotations:
         rotated = {rotate(p, size, turns): rotated_state(state, turns) for p, state in blocks.items()}
-        target = rotate(approach, size, turns)
-        seen = reachable(rotated, (target[0], target[2]), floor)
-        e = rotate(entry, size, turns)
-        if (e[0], e[2]) not in seen:
-            raise ValueError(f"Altar unreachable through entrance in rotation {turns}")
+        seen = reachable(rotated, rotate(record["altar"]["approach"], size, turns))
+        for target in (entry, tuple(record["chest_approach"])):
+            if rotate(target, size, turns) not in seen:
+                raise ValueError(f"Altar/chest unreachable through entrance in rotation {turns}")
         for road in roads:
-            p = rotate(road, size, turns)
-            if (p[0], p[2]) not in seen:
+            if rotate(road, size, turns) not in seen:
                 raise ValueError(f"Road cannot reach altar in rotation {turns}: {road}")
-        for x, z in seen:
-            if any(rotated.get((x, y, z), {}).get("id") not in SOLID for y in range(floor + 1)):
-                raise ValueError("Unsupported walking route")
-    return {"rotations": len(tuple(rotations)), "roads": len(roads), "altar": list((ax, ay, az)),
-            "columns": len(columns), "pediment": len(pediment), "foundation": len(foundation)}
+    return {"rotations": len(rotations), "roads": len(roads), "altar": [ax, ay, az],
+            **{name: len(cells) for name, cells in record["features"].items()}}
 
 
 def validate_processors(root, record, processors, tags):
@@ -253,13 +240,9 @@ def validate_processors(root, record, processors, tags):
     This does not substitute for actual terrain/downstream-piece generation.
     """
     floor = record["floor_y"]
-    x0, z0 = record["room_min"]
     ax, ay, az = record["altar"]["base"]
-    greek = record["greek"]
-    critical_positions = ({tuple(position) for position in greek["foundation"]}
-                          | {tuple(position) for position in greek["columns"]}
-                          | {tuple(position) for position in greek["pediment"]}
-                          | {(ax, ay, az), (ax, ay + 1, az)})
+    critical_positions = {tuple(cell["pos"]) for cells in record["features"].values() for cell in cells}
+    critical_positions |= {(ax, ay, az), (ax, ay + 1, az)}
 
     def state(value):
         return {"id": value} if isinstance(value, str) else value
@@ -309,7 +292,7 @@ def validate_processors(root, record, processors, tags):
             if (x, y, z) in {(ax, ay, az), (ax, ay + 1, az)}:
                 raise ValueError("Processor can change recognizable altar")
             raise ValueError("Processor can change Greek structural identity")
-        if y <= floor or y == floor + 4 and x0 <= x <= x0 + 4 and z0 <= z <= z0 + 4:
+        if y <= floor:
             if any(candidate["id"] not in SOLID for candidate in candidates):
                 raise ValueError("Processor can remove floor support or solid roof")
         elif (x, z) == (ax, az) and y in (ay, ay + 1):
@@ -373,146 +356,170 @@ def validate_pack(output=DEFAULT_OUTPUT):
     return {"roots": len(selected), "rotations": len(selected) * 4, "styles": counts}
 
 
+def road_position(joint, source_size):
+    """Move the outward connector to its corresponding enlarged plaza edge."""
+    x, y, z = joint["pos"]
+    facing = joint["state"]["properties"]["orientation"].split("_")[0]
+    w, _, d = source_size
+    if facing == "west":
+        return [0, y, 2 + round(z * 20 / (d - 1))]
+    if facing == "east":
+        return [24, y, 2 + round(z * 20 / (d - 1))]
+    if facing == "north":
+        return [2 + round(x * 20 / (w - 1)), y, 0]
+    if facing == "south":
+        return [2 + round(x * 20 / (w - 1)), y, 24]
+    raise ValueError("Road jigsaw lacks a horizontal facing")
+
+
 def author_root(source, recipe):
     root = copy.deepcopy(source)
-    w, h, d = root["size"]
     source_joints = joints(source)
-    roads = [b for b in source_joints if is_road(b)]
-    floors = {b["pos"][1] - 1 for b in roads}
+    floors = {b["pos"][1] - 1 for b in source_joints if is_road(b)}
     if len(floors) != 1:
         raise ValueError("Recipe requires a single vanilla road ground anchor")
     floor = floors.pop()
-    x0, z0 = recipe["room_min"]
-    if not (1 <= x0 <= w - 6 and 1 <= z0 <= d - 6):
-        raise ValueError("Room cannot retain a walkable perimeter inside vanilla footprint")
-    height = max(h, floor + 7)
-    root["size"] = nbt.List([w, height, d], item_tag=3)
-    materials = MATERIALS[recipe["style"]]
-    wall = materials["wall"]
-    column = materials["column"]
-    roof = materials["roof"]
-    palette = []
-    placed = {}
+    height = floor + 20
+    root["size"] = nbt.List([25, height, 25], item_tag=3)
+    palette, placed, features = [], {}, {}
 
-    def put(pos, state, metadata=None):
+    def put(x, y, z, state, feature=None, metadata=None):
+        y += floor
         if isinstance(state, str):
-            state = {"id": state if ":" in state else "minecraft:" + state}
-            if state["id"].endswith(("_log", "_wood")):
-                state["properties"] = {"axis": "y"}
+            state = {"id": "minecraft:" + state}
+        if recipe["style"] == "desert":
+            name = state["id"].removeprefix("minecraft:")
+            if name in DESERT_STONE:
+                state = {**state, "id": "minecraft:" + DESERT_STONE[name]}
         if state not in palette:
             palette.append(state)
-        block = {"pos": list(pos), "state": palette.index(state)}
+        block = {"pos": [x, y, z], "state": palette.index(state)}
         if metadata is not None:
             block["nbt"] = copy.deepcopy(metadata)
-        placed[tuple(pos)] = block
+        placed[x, y, z] = block
+        if feature:
+            features.setdefault(feature, {})[x, y, z] = state
 
-    for x in range(w):
-        for z in range(d):
-            for y in range(height):
-                put((x, y, z), "smooth_stone" if y <= floor else "air")
+    def stair(facing, half="bottom"):
+        return {"id": "minecraft:smooth_sandstone_stairs",
+                "properties": {"facing": facing, "half": half, "shape": "straight", "waterlogged": "false"}}
 
-    entry = [x0 + 2, floor + 1, z0]
-    column_positions = {(x, y, z0) for x in (x0 + 1, x0 + 3) for y in range(floor + 1, floor + 4)}
-    foundation_positions = {
-        (x, floor + 1, z)
-        for x in range(x0, x0 + 5)
-        for z in range(z0, z0 + 5)
-        if (x in (x0, x0 + 4) or z in (z0, z0 + 4)) and (x, z) != (entry[0], entry[2])
-    } - column_positions
-    pediment_positions = {(x, floor + 5, z0) for x in range(x0 + 1, x0 + 4)}
-    pediment_positions.add((x0 + 2, floor + 6, z0))
-    altar = [x0 + 2, floor + 1, z0 + 3]
-    put(altar, ALTAR_BASE)
-    put((altar[0], altar[1] + 1, altar[2]), ALTAR_TOP)
+    def slab():
+        return {"id": "minecraft:smooth_sandstone_slab", "properties": {"type": "bottom", "waterlogged": "false"}}
 
-    for position in sorted(foundation_positions):
-        put(position, FOUNDATION)
-    for position in sorted(column_positions):
-        put(position, column)
-    for x in range(x0, x0 + 5):
-        for z in range(z0, z0 + 5):
-            if not (x in (x0, x0 + 4) or z in (z0, z0 + 4)):
-                continue
-            for y in range(floor + 1, floor + 4):
-                position = (x, y, z)
-                if (x, z) == (entry[0], entry[2]) and y in (entry[1], entry[1] + 1):
-                    put(position, "air")
-                elif position in column_positions or position in foundation_positions:
-                    continue
-                else:
-                    put(position, wall)
-    for x in range(x0, x0 + 5):
-        for z in range(z0, z0 + 5):
-            put((x, floor + 4, z), roof)
-    for position in sorted(pediment_positions):
-        put(position, roof)
-
-    containers = {
-        name: [x0 + offset[0], floor + offset[1], z0 + offset[2]]
-        for name, offset in CONTAINER_OFFSETS.items()
-    }
-    container_positions = {tuple(position) for position in containers.values()}
-    source_joint_positions = {tuple(block["pos"]) for block in source_joints}
-    feature_positions = (foundation_positions | column_positions | pediment_positions
-                         | {tuple(altar), (altar[0], altar[1] + 1, altar[2])}
-                         | container_positions)
-    road_positions = {tuple(block["pos"]) for block in roads}
-    if source_joint_positions & container_positions:
-        raise ValueError("Vanilla jigsaw collides with an approved container position")
-    if road_positions & feature_positions:
-        raise ValueError("Vanilla road jigsaw collides with the Greek composition")
-    for name, position in containers.items():
-        metadata = {"id": CONTAINER_IDS[name], "Items": nbt.List([], item_tag=10)}
-        put(position, CONTAINER_STATES[name], metadata)
-    occupied = road_positions | feature_positions
-    feature_xy = {(x, z) for x, _y, z in feature_positions}
-    adjustments = []
-    final_joints = []
+    for x in range(25):
+        for z in range(25):
+            for y in range(-floor, height - floor):
+                put(x, y, z, "smooth_stone" if y <= 0 else "air")
+    # Raised terrace, broad three-step approach, and carved retaining walls.
+    for x in range(3, 22):
+        for z in range(7, 22):
+            for y in range(1, 4):
+                edge = x in (3, 21) or z in (7, 21)
+                put(x, y, z, "chiseled_sandstone" if edge and y == 2 else "cut_sandstone", "foundation")
+    for z in range(4, 7):
+        top = z - 3
+        for x in range(9, 16):
+            for y in range(1, top):
+                put(x, y, z, "cut_sandstone", "foundation")
+            put(x, top, z, stair("south"), "approach_steps")
+    # Sanctuary walls leave a deep, open portico in front.
+    for x in range(5, 20):
+        for z in range(12, 21):
+            if x in (5, 19) or z == 20:
+                for y in range(4, 11):
+                    put(x, y, z, "chiseled_sandstone" if y in (4, 10) else "smooth_sandstone", "walls")
+    for x in (6, 9, 15, 18):
+        put(x, 4, 10, "cut_sandstone", "column_bases")
+        for y in range(5, 10):
+            put(x, y, 10, "sandstone", "columns")
+        put(x, 10, 10, "gold_block", "capitals")
+        for dx in (-1, 1):
+            put(x + dx, 10, 10, stair("east" if dx == -1 else "west", "top"), "capitals")
+    # Solid gable with stepped eaves; its front tympanum carries the sun.
+    for y in range(11, 19):
+        inset = y - 11
+        for x in range(4 + inset, 21 - inset):
+            for z in range(9, 22):
+                put(x, y, z, "cut_sandstone", "roof")
+        for z in range(8, 23):
+            put(4 + inset, y, z, stair("east"), "pediment")
+            put(20 - inset, y, z, stair("west"), "pediment")
+        for x in range(5 + inset, 20 - inset):
+            put(x, y, 8, "chiseled_sandstone", "pediment")
+    for x, y in ((12, 14), (11, 14), (13, 14), (12, 13), (12, 15),
+                 (10, 12), (14, 12), (10, 16), (14, 16)):
+        put(x, y, 7, "glowstone" if (x, y) == (12, 14) else "gold_block", "sun")
+    put(12, 19, 15, slab(), "ridge")
+    # Paired carved obelisks, separate from the four-column facade.
+    for x in (4, 20):
+        for dx in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                put(x + dx, 4, 7 + dz, "cut_sandstone", "obelisks")
+        for y in range(5, 16):
+            put(x, y, 7, "chiseled_sandstone" if y % 3 else "smooth_sandstone", "obelisks")
+        put(x, 16, 7, slab(), "obelisks")
+    # Seated stone idol behind the altar, with gold crown and brow.
+    for x in range(11, 14):
+        for y in range(4, 7):
+            put(x, y, 19, "cut_sandstone", "idol")
+    for y in range(7, 10):
+        put(12, y, 19, "chiseled_sandstone", "idol")
+    for x in (11, 13):
+        put(x, 7, 19, "sandstone", "idol")
+    put(12, 10, 19, "gold_block", "idol")
+    altar = [12, floor + 4, 18]
+    put(12, 4, 18, ALTAR_BASE.removeprefix("minecraft:"))
+    put(12, 5, 18, ALTAR_TOP)
+    chest = [12, floor + 4, 16]
+    put(12, 4, 16, CONTAINER_STATES["offering_chest"],
+        metadata={"id": "minecraft:chest", "Items": nbt.List([], item_tag=10)})
+    for x in (7, 17):
+        for y in (8, 9, 10):
+            put(x, y, 12, {"id": "minecraft:iron_chain", "properties": {"axis": "y", "waterlogged": "false"}}, "lighting")
+        put(x, 7, 12, {"id": "minecraft:lantern", "properties": {"hanging": "true", "waterlogged": "false"}}, "lighting")
+    for x in (7, 17):
+        for z in (7, 17):
+            put(x, 4, z, "chiseled_sandstone", "lighting")
+            put(x, 5, z, {"id": "minecraft:lantern", "properties": {"hanging": "false", "waterlogged": "false"}}, "lighting")
+    # Road positions are derived, never guessed; ancillary connectors stay on
+    # the ground-level outer plaza, away from stairs and the raised terrace.
+    occupied = set()
+    final_joints, adjustments = [], []
     for index, block in enumerate(source_joints):
         original = list(block["pos"])
-        position = original.copy()
         metadata = block["nbt"]
         state = copy.deepcopy(source["palette"][block["state"]])
-        if not is_road(block):
+        if is_road(block):
+            position = road_position(joint_record(source, block), source["size"])
+        else:
             final = metadata["final_state"].split("[")[0]
             y = floor + 1 if final in PASSABLE else floor
-            decor = metadata["pool"].endswith("/decor")
-
-            def safe(x, z):
-                margin = 1 if decor else 0
-                if x0 - margin <= x <= x0 + 4 + margin and z0 - margin <= z <= z0 + 4 + margin:
-                    return False
-                if (x, z) in feature_xy or (x == entry[0] and z <= z0 + 1):
-                    return False
-                return (x, y, z) not in occupied
-
-            if position[1] != y or not safe(position[0], position[2]):
-                candidates = [(x, y, z) for x in range(w) for z in range(d) if safe(x, z)]
-                if not candidates:
-                    raise ValueError("No safe ancillary connector location within root")
-                position = list(min(candidates, key=lambda p: (abs(p[0] - original[0]) + abs(p[2] - original[2]), p)))
-            if position != original:
-                adjustments.append({"index": index, "from": original, "to": position,
-                                    "reason": "Keep Greek temple, entry, and final state on supported open plaza"})
+            candidates = [(x, y, z) for x in (1, 23) for z in range(2, 23)
+                          if (x, y, z) not in occupied]
+            position = list(min(candidates, key=lambda p: (abs(p[0] - original[0]) + abs(p[2] - original[2]), p)))
+        if tuple(position) in occupied:
+            raise ValueError("Expanded jigsaw positions collide")
         occupied.add(tuple(position))
-        put(position, state, metadata)
+        if position != original:
+            adjustments.append({"index": index, "from": original, "to": position,
+                                "reason": "Expand road to matching plaza edge" if is_road(block)
+                                else "Keep ancillary connector on supported outer plaza"})
+        put(position[0], position[1] - floor, position[2], state, metadata=metadata)
         final_joints.append({"pos": position, "state": state, "nbt": copy.deepcopy(metadata)})
     root["palette"] = nbt.List(palette, item_tag=10)
     root["blocks"] = nbt.List([placed[p] for p in sorted(placed, key=lambda p: (p[1], p[0], p[2]))], item_tag=10)
     root["entities"] = nbt.List([], item_tag=10)
+    # Retain only final cells if a later architectural detail overlays a feature.
+    features = {name: [{"pos": list(p), "state": state} for p, state in sorted(cells.items())
+                       if palette[placed[p]["state"]] == state] for name, cells in features.items()}
     record = {"style": recipe["style"], "source_size": list(source["size"]), "size": list(root["size"]),
-              "floor_y": floor, "room_min": [x0, z0], "room_max": [x0 + 4, z0 + 4],
-              "roof_y": floor + 4, "entry": entry,
-              "altar": {"base": altar, "top": [altar[0], altar[1] + 1, altar[2]],
-                        "approach": [altar[0], floor + 1, altar[2] - 1]},
-              "containers": containers,
-              "greek": {"foundation": [list(position) for position in sorted(foundation_positions)],
-                        "columns": [list(position) for position in sorted(column_positions)],
-                        "pediment": [list(position) for position in sorted(pediment_positions)],
-                        "approach_steps": []},
-              "materials": {"column": "minecraft:" + column, "wall": "minecraft:" + wall,
-                            "roof": "minecraft:" + roof, "foundation": FOUNDATION,
-                            "floor": "minecraft:smooth_stone"},
+              "floor_y": floor, "room_min": [5, 12], "room_max": [19, 20],
+              "roof_y": floor + 11, "entry": [12, floor + 4, 10],
+              "altar": {"base": altar, "top": [12, floor + 5, 18], "approach": [12, floor + 4, 17]},
+              "containers": {"offering_chest": chest}, "chest_approach": [12, floor + 4, 15],
+              "features": features,
+              "materials": {key: "minecraft:" + value for key, value in MATERIALS[recipe["style"]].items()},
               "source_jigsaws": [joint_record(source, b) for b in source_joints],
               "jigsaws": final_joints, "connector_adjustments": adjustments}
     validate_root(root, record)
@@ -525,15 +532,15 @@ def generate(archive, output=DEFAULT_OUTPUT):
     if checksum != ARCHIVE_SHA256:
         raise ValueError("Archive checksum does not match pinned Java 26.3 source")
     recipes = json.loads(RECIPES.read_bytes())
-    if recipes.get("composition") != "greek_temple" or recipes.get("room_size") != [5, 5]:
-        raise ValueError("Recipes must declare the Greek 5x5 temple composition")
+    if recipes.get("composition") != "sandstone_landmark" or recipes.get("plaza_size") != [25, 25]:
+        raise ValueError("Recipes must declare the sandstone 25x25 landmark composition")
     emitted = {}
     with zipfile.ZipFile(archive) as source:
         version = json.loads(source.read("version.json"))
         if (version["id"], version["world_version"], version["protocol_version"], version["pack_version"]["data_major"],
                 version["pack_version"]["data_minor"]) != ("26.3", 5023, 777, 121, 0):
             raise ValueError("Unexpected source version/format/schema")
-        manifest = {"schema": 1, "provenance": {"archive_sha256": checksum, "minecraft": "26.3",
+        manifest = {"schema": 2, "provenance": {"archive_sha256": checksum, "minecraft": "26.3",
                     "data_version": 5023, "protocol": 777, "data_pack": [121, 0],
                     "recipes_sha256": hashlib.sha256(RECIPES.read_bytes()).hexdigest(),
                     "server_image": "docker.io/itzg/minecraft-server@sha256:783d2712019a3996b4168752517a08d3448ef8995879b200316c3888f98dc394"},
@@ -580,7 +587,7 @@ def generate(archive, output=DEFAULT_OUTPUT):
     if set(recipes["roots"]) != set(manifest["roots"]):
         raise ValueError("Recipes do not cover exactly the selected roots")
     emitted[Path("pack.mcmeta")] = json_bytes(PACK_META)
-    emitted[Path("manifest.json")] = json_bytes(manifest)
+    emitted[Path("manifest.json")] = (json.dumps(manifest, separators=(",", ":")) + "\n").encode()
     # Generated outputs only: reject stale/foreign files rather than silently
     # retaining an optional house override or deleting unrelated admin files.
     if output.exists():

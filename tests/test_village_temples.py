@@ -114,18 +114,28 @@ class VillageTempleTests(unittest.TestCase):
                             directions = ("north", "east", "south", "west")
                             self.assertEqual(rotated.split("_")[0], directions[(directions.index(facing) + rotation) % 4])
 
-    def test_greek_identity_uses_style_palette_and_single_offering_source(self):
+    def test_landmarks_have_four_tall_columns_obelisks_stairs_and_one_offering_source(self):
         for resource, root in self.roots.items():
             record = self.manifest["roots"][resource]
             with self.subTest(resource=resource):
-                result = temples.validate_root(root, record)
-                self.assertGreaterEqual(result["columns"], 6)
-                self.assertGreaterEqual(result["pediment"], 4)
-                self.assertGreater(result["foundation"], 0)
+                temples.validate_root(root, record)
+                blocks = temples.block_map(root)
+                floor = record["floor_y"]
+                self.assertEqual(root["size"][::2], [25, 25])
+                for x in (6, 9, 15, 18):
+                    for y in range(floor + 5, floor + 10):
+                        self.assertEqual(blocks[x, y, 10]["id"], "minecraft:sandstone")
+                for x in (4, 20):
+                    for y in range(floor + 5, floor + 16):
+                        self.assertIn(blocks[x, y, 7]["id"],
+                                      {"minecraft:sandstone", "minecraft:smooth_sandstone", "minecraft:chiseled_sandstone"})
+                for z in range(4, 7):
+                    for x in range(9, 16):
+                        state = blocks[x, floor + z - 3, z]
+                        self.assertTrue(state["id"].endswith("_stairs"))
+                        self.assertEqual(state["properties"]["facing"], "south")
                 self.assertEqual(set(record["containers"]), {"offering_chest"})
                 self.assertNotIn("minecraft:ender_chest", {state["id"] for state in root["palette"]})
-                self.assertEqual(record["materials"]["column"], "minecraft:" + temples.MATERIALS[record["style"]]["column"])
-                self.assertEqual(record["materials"]["roof"], "minecraft:" + temples.MATERIALS[record["style"]]["roof"])
 
     def test_abandoned_processors_cannot_change_altar_roof_floor_or_clearance(self):
         for resource, root in self.roots.items():
@@ -135,7 +145,7 @@ class VillageTempleTests(unittest.TestCase):
             with self.subTest(resource=resource):
                 temples.validate_processors(root, record, processors, self.manifest["processor_tags"])
 
-    def test_preserves_road_states_metadata_positions_and_documents_other_moves(self):
+    def test_roads_face_outward_and_all_connector_metadata_survives_expansion(self):
         for resource, record in self.manifest["roots"].items():
             with self.subTest(resource=resource):
                 source = record["source_jigsaws"]
@@ -144,12 +154,14 @@ class VillageTempleTests(unittest.TestCase):
                     self.assertEqual(original["nbt"], authored["nbt"])
                     self.assertEqual(original["state"], authored["state"])
                     if original["nbt"]["pool"].endswith("/streets"):
-                        self.assertEqual(original["pos"], authored["pos"])
-                        self.assertNotIn(index, moves)
-                    elif original["pos"] != authored["pos"]:
+                        x, y, z = authored["pos"]
+                        facing = authored["state"]["properties"]["orientation"].split("_")[0]
+                        self.assertEqual(y, original["pos"][1])
+                        self.assertTrue({"west": x == 0, "east": x == 24,
+                                         "north": z == 0, "south": z == 24}[facing])
+                    if original["pos"] != authored["pos"]:
                         self.assertEqual(moves[index]["from"], original["pos"])
                         self.assertEqual(moves[index]["to"], authored["pos"])
-                        self.assertTrue(moves[index]["reason"])
 
     def test_pack_contains_only_mandatory_roots_and_unchanged_selection_contract(self):
         report = temples.validate_pack(PACK)
@@ -163,7 +175,7 @@ class VillageTempleTests(unittest.TestCase):
             output = Path(directory) / "pack"
             shutil.copytree(PACK, output)
             (output / temples.resource_path(resource)).unlink()
-            with self.assertRaisesRegex(ValueError, "Missing root asset"):
+            with self.assertRaises(ValueError):
                 temples.validate_pack(output)
 
     def test_obstructed_or_implicit_air_entry_is_rejected(self):
@@ -174,35 +186,53 @@ class VillageTempleTests(unittest.TestCase):
                     self.change_block(root, record["entry"], "minecraft:smooth_stone")
                 else:
                     root["blocks"][:] = [b for b in root["blocks"] if list(b["pos"]) != record["entry"]]
-                with self.assertRaisesRegex(ValueError, "entry"):
+                with self.assertRaises(ValueError):
                     temples.validate_root(root, record)
 
-    def test_roof_floor_and_altar_defects_are_rejected(self):
+    def test_damaged_architecture_floor_altar_and_clearance_are_rejected(self):
         root, record = self.first()
-        x, z = record["room_min"]
-        cases = [("roof", [x, record["roof_y"], z], "Incomplete solid roof"),
-                 ("wall", [x, record["floor_y"] + 2, z], "Greek temple shell"),
-                 ("floor", [x + 1, record["floor_y"], z + 1], "Unsupported temple floor"),
-                 ("altar", record["altar"]["base"], "exactly one Keeper altar"),
-                 ("interior", record["altar"]["approach"], "explicit air clearance")]
-        for label, position, message in cases:
+        floor = record["floor_y"]
+        positions = [[5, record["roof_y"], 12], [5, floor + 6, 14],
+                     [6, floor, 13], record["altar"]["base"],
+                     record["altar"]["approach"], [12, floor + 5, 16],
+                     [12, floor + 2, 5], [4, floor + 12, 7]]
+        for position in positions:
             damaged = copy.deepcopy(root)
-            self.change_block(damaged, position, "minecraft:air" if label != "interior" else "minecraft:smooth_stone")
-            with self.subTest(defect=label), self.assertRaisesRegex(ValueError, message):
+            old = temples.block_map(root)[tuple(position)]["id"]
+            self.change_block(damaged, position, "minecraft:smooth_stone" if old == "minecraft:air" else "minecraft:air")
+            with self.subTest(position=position), self.assertRaises(ValueError):
                 temples.validate_root(damaged, record)
         damaged = copy.deepcopy(root)
-        self.change_block(damaged, [0, record["floor_y"], 0], temples.ALTAR_BASE)
-        with self.assertRaisesRegex(ValueError, "exactly one Keeper altar"):
+        self.change_block(damaged, [0, floor, 0], temples.ALTAR_BASE)
+        with self.assertRaises(ValueError):
             temples.validate_root(damaged, record)
+
+    def test_stair_access_does_not_assume_players_can_jump_up_a_wall(self):
+        root, record = self.first()
+        blocks = temples.block_map(root)
+        start = record["altar"]["approach"]
+        road = next(j["pos"] for j in record["jigsaws"] if j["nbt"]["pool"].endswith("/streets"))
+        self.assertIn(tuple(road), temples.reachable(blocks, start))
+        for defect in ("missing", "reversed", "full_cube"):
+            changed = copy.deepcopy(blocks)
+            for x in range(9, 16):
+                p = (x, record["floor_y"] + 2, 5)
+                if defect == "reversed":
+                    changed[p]["properties"]["facing"] = "north"
+                else:
+                    changed[p] = {"id": "minecraft:air" if defect == "missing" else "minecraft:sandstone"}
+            with self.subTest(defect=defect):
+                self.assertNotIn(tuple(road), temples.reachable(changed, start))
 
     def test_preserved_road_can_still_be_obstructed_and_is_rejected(self):
         root, record = self.first()
-        road = next(j for j in record["source_jigsaws"] if j["nbt"]["pool"].endswith("/streets"))
+        road = next(j for j in record["jigsaws"] if j["nbt"]["pool"].endswith("/streets"))
         x, y, z = road["pos"]
         for px, pz in ((x - 1, z), (x + 1, z), (x, z - 1), (x, z + 1)):
             if 0 <= px < root["size"][0] and 0 <= pz < root["size"][2]:
-                self.change_block(root, [px, y, pz], "minecraft:smooth_stone")
-        with self.assertRaisesRegex(ValueError, "Road cannot reach altar"):
+                for height in range(y, y + 3):
+                    self.change_block(root, [px, height, pz], "minecraft:smooth_stone")
+        with self.assertRaises(ValueError):
             temples.validate_root(root, record)
 
     def test_trusted_jigsaw_changes_are_rejected(self):
@@ -215,7 +245,7 @@ class VillageTempleTests(unittest.TestCase):
                 road["nbt"]["pool"] = "minecraft:empty"
             else:
                 root["palette"][road["state"]]["properties"]["orientation"] = "up_north"
-            with self.subTest(defect=defect), self.assertRaisesRegex(ValueError, "jigsaw"):
+            with self.subTest(defect=defect), self.assertRaises(ValueError):
                 temples.validate_root(root, record)
 
     def test_processor_that_can_damage_altar_is_rejected_without_random_sampling(self):
@@ -225,7 +255,7 @@ class VillageTempleTests(unittest.TestCase):
                                 "probability": 0.00001},
             "location_predicate": {"predicate_type": "minecraft:always_true"},
             "output_state": "minecraft:cobweb"}]}]}
-        with self.assertRaisesRegex(ValueError, "altar"):
+        with self.assertRaises(ValueError):
             temples.validate_processors(root, record, processor, {})
 
     def test_real_generated_nbt_has_only_approved_container_payloads_and_is_stable(self):

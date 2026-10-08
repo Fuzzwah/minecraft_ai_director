@@ -1,266 +1,106 @@
 {
-  "schema": 2,
-  "composition": "greek_temple",
-  "room_size": [
-    5,
-    5
+  "schema": 3,
+  "composition": "sandstone_landmark",
+  "plaza_size": [
+    25,
+    25
   ],
   "roots": {
     "minecraft:village/plains/town_centers/plains_fountain_01": {
-      "style": "plains",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/plains/town_centers/plains_meeting_point_1": {
-      "style": "plains",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/plains/town_centers/plains_meeting_point_2": {
-      "style": "plains",
-      "room_min": [
-        1,
-        5
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/plains/town_centers/plains_meeting_point_3": {
-      "style": "plains",
-      "room_min": [
-        3,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/plains/zombie/town_centers/plains_fountain_01": {
-      "style": "plains",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/plains/zombie/town_centers/plains_meeting_point_1": {
-      "style": "plains",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/plains/zombie/town_centers/plains_meeting_point_2": {
-      "style": "plains",
-      "room_min": [
-        1,
-        5
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/plains/zombie/town_centers/plains_meeting_point_3": {
-      "style": "plains",
-      "room_min": [
-        3,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "plains"
     },
     "minecraft:village/desert/town_centers/desert_meeting_point_1": {
-      "style": "desert",
-      "room_min": [
-        10,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "desert"
     },
     "minecraft:village/desert/town_centers/desert_meeting_point_2": {
-      "style": "desert",
-      "room_min": [
-        3,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "desert"
     },
     "minecraft:village/desert/town_centers/desert_meeting_point_3": {
-      "style": "desert",
-      "room_min": [
-        5,
-        5
-      ],
-      "entrance_side": "north"
+      "style": "desert"
     },
     "minecraft:village/desert/zombie/town_centers/desert_meeting_point_1": {
-      "style": "desert",
-      "room_min": [
-        10,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "desert"
     },
     "minecraft:village/desert/zombie/town_centers/desert_meeting_point_2": {
-      "style": "desert",
-      "room_min": [
-        3,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "desert"
     },
     "minecraft:village/desert/zombie/town_centers/desert_meeting_point_3": {
-      "style": "desert",
-      "room_min": [
-        5,
-        5
-      ],
-      "entrance_side": "north"
+      "style": "desert"
     },
     "minecraft:village/savanna/town_centers/savanna_meeting_point_1": {
-      "style": "savanna",
-      "room_min": [
-        4,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/savanna/town_centers/savanna_meeting_point_2": {
-      "style": "savanna",
-      "room_min": [
-        3,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/savanna/town_centers/savanna_meeting_point_3": {
-      "style": "savanna",
-      "room_min": [
-        2,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/savanna/town_centers/savanna_meeting_point_4": {
-      "style": "savanna",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/savanna/zombie/town_centers/savanna_meeting_point_1": {
-      "style": "savanna",
-      "room_min": [
-        4,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/savanna/zombie/town_centers/savanna_meeting_point_2": {
-      "style": "savanna",
-      "room_min": [
-        3,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/savanna/zombie/town_centers/savanna_meeting_point_3": {
-      "style": "savanna",
-      "room_min": [
-        2,
-        3
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/savanna/zombie/town_centers/savanna_meeting_point_4": {
-      "style": "savanna",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "savanna"
     },
     "minecraft:village/snowy/town_centers/snowy_meeting_point_1": {
-      "style": "snowy",
-      "room_min": [
-        3,
-        1
-      ],
-      "entrance_side": "north"
+      "style": "snowy"
     },
     "minecraft:village/snowy/town_centers/snowy_meeting_point_2": {
-      "style": "snowy",
-      "room_min": [
-        3,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "snowy"
     },
     "minecraft:village/snowy/town_centers/snowy_meeting_point_3": {
-      "style": "snowy",
-      "room_min": [
-        1,
-        1
-      ],
-      "entrance_side": "north"
+      "style": "snowy"
     },
     "minecraft:village/snowy/zombie/town_centers/snowy_meeting_point_1": {
-      "style": "snowy",
-      "room_min": [
-        3,
-        1
-      ],
-      "entrance_side": "north"
+      "style": "snowy"
     },
     "minecraft:village/snowy/zombie/town_centers/snowy_meeting_point_2": {
-      "style": "snowy",
-      "room_min": [
-        3,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "snowy"
     },
     "minecraft:village/snowy/zombie/town_centers/snowy_meeting_point_3": {
-      "style": "snowy",
-      "room_min": [
-        1,
-        1
-      ],
-      "entrance_side": "north"
+      "style": "snowy"
     },
     "minecraft:village/taiga/town_centers/taiga_meeting_point_1": {
-      "style": "taiga",
-      "room_min": [
-        2,
-        1
-      ],
-      "entrance_side": "north"
+      "style": "taiga"
     },
     "minecraft:village/taiga/town_centers/taiga_meeting_point_2": {
-      "style": "taiga",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "taiga"
     },
     "minecraft:village/taiga/zombie/town_centers/taiga_meeting_point_1": {
-      "style": "taiga",
-      "room_min": [
-        2,
-        1
-      ],
-      "entrance_side": "north"
+      "style": "taiga"
     },
     "minecraft:village/taiga/zombie/town_centers/taiga_meeting_point_2": {
-      "style": "taiga",
-      "room_min": [
-        2,
-        2
-      ],
-      "entrance_side": "north"
+      "style": "taiga"
     }
   }
 }

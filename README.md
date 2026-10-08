@@ -247,6 +247,51 @@ Starting Minecraft also activates its wanted Keeper service; explicitly stop
 that writer again before a writer-stopped preview rather than assuming it stayed
 stopped. Authenticated production client access remains unverified.
 
+## Landmark village temples
+
+The bundled `datapack/director_village_temples` now authors sandstone-and-gold
+landmarks rather than the previous 5×5 rooms. Each occupies a **25×25 plaza**,
+with a three-block raised terrace, seven-block-wide staircase, four tall front
+columns, carved twin obelisks, layered gable and gold sun motif, hanging lanterns,
+and a recessed stone idol behind the altar. The single empty normal offering
+chest is centered in the sanctuary, with clear lid space and walking access.
+No resource pack, custom textures, embedded entities, or additional containers
+are required. Fine hieroglyphs and sculpture in the reference are approximated
+with vanilla carved blocks.
+
+All 32 normal/abandoned roots across the five village styles use this silhouette.
+Desert roots use base sandstone stairs/slabs and masonry instead of smooth/cut
+sandstone, because vanilla desert abandonment processors can turn the latter
+into cobwebs. Vanilla pool weights, projections, processors, and village
+placement rules remain unchanged. Root bounds expand; road connectors move to
+the outer edge matching their original facing, retaining height and connection
+metadata. Ancillary connectors move to the ground-level perimeter. Rotation
+validation checks supported stair access from every road to both altar and chest.
+
+Rebuild from the pinned Java 26.3 server archive, or inspect committed assets:
+
+```bash
+python3 -B tools/village_temples.py --archive /path/to/server-26.3-core.jar
+python3 -B tools/village_temples.py --check
+```
+
+This is a **generation-asset change, not a live-world retrofit**. Existing
+temples, the configured offering chest, quest state, and settlement starter
+templates are untouched. Installing the reviewed pack affects newly generated
+village starts only. Replacing an existing temple needs a separately planned,
+backed-up world edit; do not regenerate the player world or move the Director's
+chest coordinates merely to apply this visual redesign.
+
+Isolated Java 26.3 verification generated villages in all five styles with
+downstream vanilla pieces. An official vanilla client rendered the landmark,
+walked from the plaza up the stairs in survival mode without jumping, and opened
+its empty offering chest. The final template's non-air palette states passed
+real-server checks in all four rotations, and the final naturally generated
+stairs, hanging lights, and empty chest survived a server restart. These checks
+used a loopback-only offline test server, not an authenticated production
+session. Preview captures are retained under ignored `.runtime/landmark-smoke/`;
+no production rollout was performed.
+
 ## Safely enable settlements
 
 1. Back up the Minecraft world and Director state.

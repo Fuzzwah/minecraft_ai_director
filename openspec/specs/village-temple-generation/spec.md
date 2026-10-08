@@ -15,11 +15,11 @@ With the generation pack installed before terrain generation, each newly generat
 - **AND** no second Keeper temple is introduced through optional village pieces
 
 ### Requirement: Recognizable and usable temple
-Each Keeper temple SHALL have a roofed interior, a visible altar, and an unobstructed entrance reachable from the village center. Its exterior SHALL use materials appropriate to its village style, with a consistent altar identity across styles.
+Each Keeper temple SHALL be a sandstone-and-gold landmark on a 25×25 plaza, with a raised terrace and broad staircase, four tall front columns, twin carved obelisks, a layered pediment with a sun motif, warm lantern lighting, and a recessed stone idol behind the consistent Keeper altar. Its roofed sanctuary SHALL contain exactly one empty normal offering chest with unobstructed lid space and player access. Desert variants SHALL use processor-safe sandstone materials so abandonment cannot remove structural features or obstruct access.
 
 #### Scenario: Player explores the village center
 - **WHEN** a player approaches a newly generated temple in any supported village style
-- **THEN** the player can identify the roofed temple, walk through its entrance, and reach the altar without breaking blocks
+- **THEN** the player can identify the landmark, ascend its stairs without jumping or breaking blocks, enter the sanctuary, reach the altar, and open the offering chest
 
 #### Scenario: Temple generates with an abandoned village
 - **WHEN** the selected village is abandoned
@@ -35,6 +35,8 @@ The feature SHALL retain Java 26.3's vanilla village placement rules, biome elig
 
 ### Requirement: Preserve functional village connections
 Temple-bearing town centers SHALL preserve functional connections to vanilla village roads and downstream building pieces in every supported rotation. Their foundations and interior clearance SHALL be compatible with vanilla village terrain adaptation.
+The enlarged town-center roots SHALL relocate road connectors to the plaza edge corresponding to each connector's original facing, while preserving their original height, orientation, names, targets, pools, and final states. Ancillary connectors SHALL remain on supported ground outside the raised temple. Every relocation SHALL be recorded in the generated manifest. The previous compact horizontal footprint is not retained.
+
 
 #### Scenario: Village generates on uneven terrain
 - **WHEN** a temple-bearing village generates on uneven terrain using a supported root rotation
