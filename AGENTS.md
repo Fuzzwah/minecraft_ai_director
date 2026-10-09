@@ -103,10 +103,11 @@ validate rotations as well as unrotated footprints.
 
 For RCON/world changes, also smoke the actual Java test server below. Start with
 an admin dry-run and inspect plot availability before any live construction.
-Village-temple generation and adaptive offerings target Java 26.3; the existing
-settlement construction test server remains Java 1.21.1 and must not be used as
-proof of temple generation. Do not use a startup or construction retry as a
-recovery mechanism.
+Village-temple generation and adaptive offerings target Java 26.3. The isolated
+settlement server below also runs 26.3, but its existing construction plots do
+not prove village generation: use a disposable 26.3 world with the generation
+pack installed before first terrain generation. Do not use a startup or
+construction retry as a recovery mechanism.
 
 Previously verified on Java 1.21.1: dry-run immutability, staged workshop
 construction, chest rejection, owned cottage-to-house upgrade, safe removal,
@@ -126,21 +127,178 @@ with source mounted read-only from primary `main` at
 workflow before synchronizing that checkout; never mount an implementation
 worktree into the live Director.
 
-Stop the Director writer first, flush the world, then stop Minecraft before
-capturing complete paired `mc_ai_director_default_data` and
-`mc_ai_director_default_state` rollback archives. Keep private archive permissions
-and checksums in a manifest under `/home/fuz/mc-ai-director-backups/`; retain
-existing reconciliation snapshots. Preserve current configuration, quest JSON,
-any SQLite state, world-generation identity, village hub, and chest coordinates.
-This quest-policy upgrade does not regenerate terrain or reset progression.
+### Live identity and configuration
 
-The Minecraft service **Wants the Keeper service**, and the Keeper is bound to
-and part of Minecraft. Starting Minecraft can therefore start the Director too.
-Inspect actual activation; explicitly stop the Keeper again before a
-writer-stopped read-only preview, then restore the single writer afterward.
-For mounted-world previews, reuse the live container's user-namespace identity;
-do not change volume ownership to bypass permissions. No candidate below its
-verified catalog-minimum yield is a valid opening quest; deferral is intentional.
+The landmark world is deployed through PR #12; PR #13 records its acceptance.
+Current world spawn and Director hub are **`76, 90, 298`**, and the normal offering
+chest is **`76, 90, 304`**. The nearest village is plains at `64, ~, 288`; its
+temple bounds are `64, 86, 288` through `88, 105, 312`. These are observed
+coordinates, not defaults for another world. Inspect current state before use.
+
+- Minecraft data: named volume `mc_ai_director_default_data`, mounted at `/data`.
+- Keeper mounts that data read-only at `/minecraft` and
+  `mc_ai_director_default_state` read-write at `/state`. Active quest JSON is
+  `/state/director_state.json`; optional SQLite is `/state/director_settlement.sqlite3`.
+- Quadlet sources:
+  `/home/fuz/.config/containers/systemd/mc_ai_director_default.container` and
+  `mc_ai_director_default_keeper.container` in the same directory. Edit these,
+  not generated units under `/run/user/1000/systemd/generator/`.
+- Private Keeper environment: `/home/fuz/code/minecraft_ai_director/director.env`.
+  RCON comes from Podman secret `mc_ai_director_default_rcon`; never print full
+  container environments, server properties, secrets, or private env files.
+- Hub/chest overrides are in the Keeper Quadlet. Changing world spawn does not
+  update those overrides; run `systemctl --user daemon-reload` after unit edits.
+- Minecraft uses `OVERRIDE_SERVER_PROPERTIES=false`: existing
+  `/data/server.properties` is authoritative. Merely adding image environment
+  variables will not rewrite its settings. Keep `pause-when-empty-seconds=-1`;
+  disabling image autopause alone does not disable Java's native idle pause.
+- Current policy is survival/normal, online authentication, and settlements
+  disabled. Preserve actual access policy and the existing LLM configuration;
+  do not copy the isolated server's creative/DEMO settings into production.
+
+The pre-landmark rollback generation, paired archives, checksums, private
+configuration, and deployment evidence are under
+`/home/fuz/mc-ai-director-backups/live-landmark-regeneration-20261008T221528Z/`.
+Retain it and older reconciliation snapshots. It is not a substitute for a
+fresh backup after subsequent play.
+
+### Routine update procedure — preserve the world
+
+1. Inspect live service/container status, players, mounts, and primary checkout
+   changes. Use rootless Podman and `systemctl --user` as `fuz`, never
+   `sudo podman`. Preserve unrelated files such as an untracked `registries.json`.
+   Use **systemd** to manage this deployment, not the isolated server's wrappers
+   or `podman restart` behind systemd's back.
+2. Verify and merge the topic-branch PR before synchronizing primary `main`.
+   Stop the Keeper before changing its mounted Python source. Fast-forward the
+   primary checkout only; never force-reset it or mount an implementation worktree.
+   A read-only bind mount still sees host edits. Python changes need a Keeper
+   restart; documentation-only changes do not require either service to restart.
+3. For world/configuration/datapack changes, stop Keeper, flush Minecraft, then
+   stop Minecraft before taking complete paired data/state archives plus private
+   configuration and deployment references. Use directory mode `0700`, archive
+   and manifest mode `0600`, verify archive contents and SHA256 checksums, and
+   record the seed, spawn, hub, chest, and source commit. Preserve quest JSON,
+   SQLite (including any journal/WAL files), world identity, and recovery records.
+4. Install reviewed runtime datapack/config **copies** explicitly while stopped;
+   updating Git alone does not update the pack under `world/datapacks`.
+   Ordinary updates never delete terrain, reset progression, move the offering
+   chest, or change the seed. Updated village roots affect new village starts,
+   not existing temples. Regeneration requires separate explicit authorization.
+5. Start only stopped services. For a new Minecraft startup, require that
+   startup's `Done ... For help` line, then verify RCON. A systemd `active`
+   result or bound port alone is not readiness. If Minecraft was already running,
+   use `rcon-cli list` rather than waiting for a startup line that will not recur.
+6. Verify the changed path with Keeper stopped: loaded chunks, actual block
+   states/container identity, current coordinates, and a read-only Director
+   preview as appropriate. Use `DIRECTOR_DRY_RUN=1`, read-only world/state mounts,
+   and API probes, **not a second Director loop or an LLM call**. Compare state
+   checksums around the preview. A missing/below-minimum supply candidate means
+   defer; never fabricate crops, widen the warm-up radius, or move the hub to
+   manufacture a passing check.
+7. After acceptance, restore any temporary admission policy and start exactly
+   one Keeper writer. Check its startup log, effective hub/chest settings,
+   authenticated RCON access, and both service states. For world changes, verify
+   save/restart persistence before reopening. If mutation/state is uncertain,
+   stop writers and restore the matched generation or reconcile offline; never
+   retry placement, discard debt, or mix old world and new state.
+
+**Prevent accidental Keeper activation:** Minecraft **Wants** Keeper, and Keeper
+is `BindsTo`/`PartOf` Minecraft. Starting Minecraft can start the writer too.
+For an update requiring a writer-stopped startup, use this maintenance sequence
+(not for a status-only inspection):
+
+```bash
+systemctl --user stop mc_ai_director_default_keeper.service
+systemctl --user mask --runtime mc_ai_director_default_keeper.service
+podman exec mc_ai_director_default rcon-cli save-all flush
+systemctl --user stop mc_ai_director_default.service
+# Take and verify backups; install the authorized update while stopped.
+systemctl --user start mc_ai_director_default.service
+# Wait for this startup's readiness, inspect actual activation, run read-only checks.
+# Only after acceptance (or verified rollback), restore the writer:
+systemctl --user unmask --runtime mc_ai_director_default_keeper.service
+systemctl --user daemon-reload
+systemctl --user start mc_ai_director_default_keeper.service
+```
+
+Do not leave the runtime mask installed after completing maintenance. Stop log
+following separately; detaching a log watcher must not stop Minecraft.
+
+### Rootless storage and first-generation pitfalls
+
+Resolve named-volume paths with `podman volume inspect --format '{{.Mountpoint}}'
+<volume>` rather than guessing another user's container store. Host file tools
+may report an inaccessible mapped directory as empty; this is **not** evidence
+that world/state is absent. Inspect it through `podman unshare` or the correct
+container, without dumping credential-bearing files. Never recursively chown a
+volume to make a preview work.
+
+The live containers use Podman's **default rootless user namespace** (empty
+`HostConfig.UsernsMode`), unlike the isolated Keeper's `keep-id` mapping. A
+verified mounted-world preview used that same default namespace and
+`--network=container:mc_ai_director_default`, read-only volume mounts, and the
+existing RCON secret. Explicitly requesting
+`--userns=container:mc_ai_director_default` failed with crun `cannot setns ...
+Invalid argument`; do not repeat it when both containers already use the default
+namespace. Inspect the current mode before choosing flags; never compensate by
+changing live volume ownership.
+
+For **explicitly authorized regeneration only**, preserve the current seed and
+generation/access policy unless the user separately requests changes. Install
+the verified pack before first generation, gate normal player admission during
+acceptance without disabling online authentication, and provision fresh player
+and quest state (plus a fresh database/world ID if settlements are enabled).
+Do not import old pending operations into new terrain.
+
+Create **both** the new world parent and its datapacks child with the Minecraft
+process's mapped UID/GID. This deployment's verified in-namespace identity is
+`1000:1000`; inspect it again before use. Creating only the leaf with
+`install -d -o 1000 -g 1000` leaves intermediate parents owned by namespace root.
+That caused `AccessDeniedException: ./world/session.lock` before generation.
+After moving the backed-up old world aside, the explicit creation is:
+
+```bash
+# DATA is the inspected data-volume mountpoint; server stopped, regeneration authorized.
+podman unshare install -d -m 775 -o 1000 -g 1000 \
+  "$DATA/world" "$DATA/world/datapacks"
+podman unshare stat -c '%n uid=%u gid=%g mode=%a' \
+  "$DATA/world" "$DATA/world/datapacks"
+```
+
+Check ownership **before** starting. If bootstrap fails, stop the service and
+inspect actual files and the exact error. Only correct a proven setup defect in
+the new, ungenerated directory; never repeatedly start, regenerate, or alter
+existing world ownership as a recovery mechanism.
+
+### Java 26.3 verification details
+
+- Use `tools/nbt.py` and `quest_supply.AnvilWorldReader` for real saved data.
+  Overworld regions are under `world/dimensions/minecraft/overworld/region/`.
+  Spawn is `Data.spawn.pos` in `world/level.dat`; seed/generator are in
+  `world/data/minecraft/world_gen_settings.dat` (`data.seed`), not an assumed
+  older `level.dat` layout. Decode only required fields; avoid dumping private data.
+- Locate all five village styles from the recorded pre-regeneration spawn and
+  choose the nearest horizontal result. Derive temple/chest coordinates from
+  the actual generated root and rotation, not repository example coordinates.
+  Confirm solid support, two-block player clearance, stairs/road access, and
+  chest-lid clearance before setting spawn or updating Keeper overrides.
+- `setworldspawn <x> <y> <z>` works. Do not append a lone yaw: this version expects
+  both yaw and pitch if orientation is supplied. The rule is
+  `minecraft:respawn_radius`, **not** `minecraft:spawn_radius`; current value `0`
+  keeps default respawns at the verified entrance. Preserve it on routine updates.
+- For the vanilla `place template` command, the half-turn argument is `180`,
+  not `clockwise_180`. Do not confuse command syntax with internal rotation names.
+  Iron chains use `minecraft:iron_chain`, not `minecraft:chain`; unknown template
+  IDs can disappear silently. Verify actual placed states, not just NBT decoding.
+- Bare `execute if loaded ...` / `execute if block ...` returns `Test passed` or
+  `Test failed`. An empty response from `... run say ...` is not proof of success.
+  Check the normal chest's exact identity and contents through `data get block`.
+- A successful status handshake at `10.1.1.232:25555` verifies Java 26.3/protocol
+  777, not authenticated gameplay. Landmark client rendering, survival stair
+  traversal, and chest opening were verified on an isolated vanilla client.
+  Do not claim authenticated production joining or quest completion from those
+  results, RCON, or mocked tests alone.
 
 ## Isolated test server on this host
 
