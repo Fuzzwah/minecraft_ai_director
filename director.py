@@ -944,11 +944,14 @@ def process_pending_rewards(state: State, manager) -> list[dict]:
                                 and (not xp_required or pending.xp_done)
                                 and (manager is None or pending.recorded))
             if vanilla_done and obligations_done:
+                # Successful completion makes only this lane immediately due.
                 if quest.lane == "communal":
                     state.communal_completions = min(3, state.communal_completions + 1)
+                    state.last_communal_quest_at = 0.0
                 else:
                     state.private_completions[quest.player] = min(
                         3, state.private_completions.get(quest.player, 0) + 1)
+                    state.private_quest_at[quest.player] = 0.0
                 _clear_quest_lane(state, quest)
                 state.pending_settlement_rewards.remove(pending)
                 save_state(state)
@@ -1177,11 +1180,6 @@ def schedule_quests(state: State, players: list[str], recent_events: list[str], 
     score = average_strength(profiles)
     assigned = []
     for lane, player in due:
-        if not DRY_RUN:
-            if lane == "communal":
-                state.last_communal_quest_at = now
-            else:
-                state.private_quest_at[player] = now
         profile = profiles.get(player) if player else None
         if lane == "private" and profile is None:
             continue
@@ -1192,6 +1190,12 @@ def schedule_quests(state: State, players: list[str], recent_events: list[str], 
         strength = score if lane == "communal" else profile.score
         candidates = candidate_items(lane, profile, snapshot, strength,
                                      state=state, communal_score=score)
+        # A failed observation must not put an unassigned lane on cooldown.
+        if not DRY_RUN:
+            if lane == "communal":
+                state.last_communal_quest_at = now
+            else:
+                state.private_quest_at[player] = now
         if not candidates:
             print(f"[QUEST] {lane} lane declined for {player or 'the group'}: no safe unreserved candidates")
             continue
