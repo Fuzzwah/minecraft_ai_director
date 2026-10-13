@@ -410,7 +410,8 @@ class DirectorTests(unittest.TestCase):
             self.assertEqual(state.pending_settlement_rewards, [pending])
         quest = self.opening()
         pending = director.PendingReward(quest, 0, consumption="done", recipients=[quest.player])
-        state = director.State(pending_settlement_rewards=[pending])
+        state = director.State(pending_settlement_rewards=[pending],
+                               private_quest_at={quest.player: 9999})
         with patch.object(director, "DRY_RUN", True):
             director.process_pending_rewards(state, None)
         self.assertEqual(state.private_completions, {})
@@ -418,17 +419,20 @@ class DirectorTests(unittest.TestCase):
         director.process_pending_rewards(state, None)
         self.assertEqual(state.private_completions, {})
         self.assertEqual(state.pending_settlement_rewards, [pending])
+        self.assertEqual(state.private_quest_at[quest.player], 9999)
 
     def test_lost_vanilla_response_never_advances_completion(self):
         quest = self.opening()
         pending = director.PendingReward(quest, 0, consumption="done", recipients=[quest.player])
-        state = director.State(pending_settlement_rewards=[pending])
+        state = director.State(pending_settlement_rewards=[pending],
+                               private_quest_at={quest.player: 9999})
         with patch.object(director, "rcon", side_effect=OSError("lost reward response")):
             director.process_pending_rewards(state, None)
         loaded = director.load_state()
         director.process_pending_rewards(loaded, None)
         self.assertTrue(loaded.pending_settlement_rewards[0].vanilla_uncertain)
         self.assertEqual(loaded.private_completions, {})
+        self.assertEqual(loaded.private_quest_at[quest.player], 9999)
 
     def test_reservations_include_offline_legacy_and_pending_deduplicated_ids(self):
         communal = self.opening(lane="communal", quest_id="group")
@@ -536,6 +540,59 @@ class DirectorTests(unittest.TestCase):
         self.assertIn("Everyone", assigned[0].announcement)
         self.assertTrue(all(q.quantity == director.QUEST_CATALOG[q.item]["min"] for q in assigned))
         self.assertEqual(state.private_issued, {})
+
+    def test_completed_lane_replaced_immediately_after_restart(self):
+        for lane in ("communal", "private"):
+            with self.subTest(lane=lane), patch.object(director.time, "time", return_value=10000), \
+                    patch.object(director, "DEMO_MODE", True):
+                player = "CheekyHambone"
+                quest = self.opening(lane=lane, item="minecraft:wheat")
+                state = director.State(last_communal_quest_at=9999, private_quest_at={player: 9999})
+                if lane == "communal":
+                    state.communal_quest = quest
+                else:
+                    state.private_quests[player] = quest
+                self.world.players[:] = [player]
+                self.world.chest_items[:] = [(0, "minecraft:wheat", 6)]
+                director.complete_quest(state, quest)
+                loaded = director.load_state()
+                assigned = director.schedule_quests(
+                    loaded, [player], [], profiles={player: self.profile()},
+                    snapshots={True: self.local_supply({"minecraft:wheat": 12})})
+                self.assertEqual([q.lane for q in assigned], [lane])
+                self.assertEqual([(q.item, q.quantity) for q in assigned], [("minecraft:wheat", 6)])
+                self.assertNotEqual(assigned[0].quest_id, quest.quest_id)
+                self.assertEqual(self.world.chest_items, [])
+                self.assertEqual((loaded.communal_completions, loaded.private_completions),
+                                 (1, {}) if lane == "communal" else (0, {player: 1}))
+
+    def test_supply_timeout_does_not_skip_communal_on_next_poll(self):
+        state = director.State()
+        player = "CheekyHambone"
+        profiles = {player: self.profile()}
+        with patch.object(director.time, "time", return_value=10000), \
+                patch.object(director, "supply_snapshot", side_effect=director.RconError("timed out")):
+            with self.assertRaises(director.RconError):
+                director.schedule_quests(state, [player], [], profiles=profiles)
+        with patch.object(director.time, "time", return_value=10005), \
+                patch.object(director, "DEMO_MODE", True):
+            assigned = director.schedule_quests(
+                state, [player], [], profiles=profiles, snapshots={True: self.local_supply()})
+        self.assertEqual([q.lane for q in assigned], ["communal", "private"])
+        self.assertEqual({q.item for q in assigned}, {"minecraft:wheat", "minecraft:pumpkin"})
+
+    def test_observed_empty_supply_keeps_deferral_interval(self):
+        state = director.State()
+        player = "CheekyHambone"
+        with patch.object(director.time, "time", return_value=10000):
+            self.assertEqual(director.schedule_quests(
+                state, [player], [], profiles={player: self.profile()},
+                snapshots={True: self.local_supply({})}), [])
+        with patch.object(director.time, "time", return_value=10005), \
+                patch.object(director, "DEMO_MODE", True):
+            self.assertEqual(director.schedule_quests(
+                state, [player], [], profiles={player: self.profile()},
+                snapshots={True: self.local_supply()}), [])
 
     def test_existing_carrot_quantity_ten_retired_without_consuming_or_counting(self):
         quest = self.opening(lane="communal", item="minecraft:carrot", quantity=10, legacy=True)

@@ -121,6 +121,7 @@ Configure the generated temple's offering chest explicitly:
 | `MINECRAFT_WORLD` | `/minecraft/world` |
 | `OFFERING_CHEST_X/Y/Z` | unset; communal quests decline until configured |
 | `SPAWN_SUPPLY_RADIUS` | `64` blocks |
+| `QUEST_INTERVAL_SECONDS` | `600` seconds between ordinary assignment attempts per lane |
 
 Both communal and private quests use the configured loaded normal offering
 chest. A communal quest rewards all eligible online players at completion; a
@@ -153,6 +154,18 @@ pending offering/reward operations reserve distinct item IDs. New assignments
 respect reservations in both directions. If wheat and pumpkins are already
 reserved and nothing else qualifies, another personal warm-up waits; it does
 not request the same item or jump to harder materials.
+
+A fully successful completion makes that lane eligible for a replacement in the
+same Director tick, including after a restart; it does not wait out the ordinary
+assignment interval. The replacement still needs safe, unreserved candidates.
+Completed observations with no candidates defer the lane for the configured
+interval. A failed supply probe does not start that cooldown: the next poll can
+try again, with the communal lane retaining priority. Pending or uncertain
+consumption/rewards do not trigger an immediate replacement.
+
+Announcements beginning `Everyone:` are communal; those beginning with a
+player's name are personal. When only one nearby item qualifies, it cannot serve
+both lanes at once, so a personal quest may legitimately wait.
 
 After communal warm-up, communal difficulty uses the eligible-player average.
 After personal warm-up, a normal personal goal is one material band above the
