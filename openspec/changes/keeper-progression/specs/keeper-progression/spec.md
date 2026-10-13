@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Give all players a shared, persistent Keeper whose rank grows through successful offerings and unlocks bounded protective blessings and modest player XP bonuses without changing quest ownership or item rewards.
+Give each temple Keeper an independent persistent rank shared by its contributors, with bounded protective blessings and modest player XP bonuses from successful player offerings without changing quest ownership or item rewards.
 
 ## ADDED Requirements
 
-### Requirement: Award equal shared completion credit
-When Keeper progression is enabled, each fully successful personal or communal quest SHALL award exactly one Keeper XP to the world's shared Keeper, independently of difficulty, quantity, number of recipients, or settlement enablement. Failed, retired, dry-run, pending, and uncertain quests SHALL award no credit.
+### Requirement: Award equal issuing-Keeper completion credit
+Each fully successful personal or communal player quest SHALL award one XP to its issuing Keeper when progression is enabled, independently of difficulty, quantity, recipients, or settlements. All contributors SHALL share that Keeper's progress; separate Keepers SHALL have independent totals. Failed, retired, dry-run, pending, and uncertain quests SHALL award no credit.
 
 #### Scenario: Different quest lanes and difficulties contribute equally
-- **WHEN** one personal quest and one communal quest of different reward tiers fully complete
-- **THEN** the shared Keeper total increases by two
-- **AND** the communal quest contributes one credit whether it rewards one or several players
+- **WHEN** one personal quest and one communal quest of different tiers fully complete for Keeper A
+- **THEN** A's total increases by two and Keeper B's total is unchanged
+- **AND** A's communal quest contributes one credit whether it rewards one or several players
 
 #### Scenario: An offering or reward is unresolved
 - **WHEN** consumption, a player reward, or a required settlement obligation remains pending or uncertain
@@ -20,7 +20,7 @@ When Keeper progression is enabled, each fully successful personal or communal q
 - **AND** credit is earned only when all required obligations subsequently resolve successfully
 
 ### Requirement: Preserve credit idempotently across restarts
-A successful quest's Keeper credit, lane completion, and retirement SHALL become durable together. Reprocessing that quest ID after a later tick, restart, or attempted duplicate completion SHALL NOT consume another offering, grant another reward, or increase Keeper XP again.
+A successful player quest's issuer-specific Keeper credit, lane completion, and retirement SHALL become durable together. Reprocessing that quest ID after a later tick, restart, or attempted duplicate completion SHALL NOT consume another offering, grant another reward, or increase any Keeper's XP again.
 
 #### Scenario: Restart after a successful completion
 - **WHEN** the Director restarts after the completion was persisted
@@ -33,7 +33,7 @@ A successful quest's Keeper credit, lane completion, and retirement SHALL become
 - **AND** restart uses the saved reward progress rather than issuing acknowledged rewards again
 
 ### Requirement: Use cumulative fixed rank milestones
-The Keeper SHALL start at rank 1 Dormant and advance to rank 2 Awakened at 3 credits, rank 3 Warden at 10, rank 4 Exalted at 25, and rank 5 Ascendant at 50. Rank SHALL remain capped at 5 while the lifetime completion total continues increasing. Keeper rank SHALL NOT raise quest difficulty or bypass existing supply/progression rules.
+Each Keeper SHALL independently start at rank 1 Dormant, reach rank 2 Awakened at 3 credits, rank 3 Warden at 10, rank 4 Exalted at 25, and rank 5 Ascendant at 50. Rank SHALL cap at 5 while its lifetime total continues increasing. One Keeper's advancement SHALL NOT raise another's rank or change quest difficulty/supply rules.
 
 #### Scenario: A completion crosses a milestone
 - **WHEN** a successful quest increases the total from 9 to 10
@@ -46,11 +46,11 @@ The Keeper SHALL start at rank 1 Dormant and advance to rank 2 Awakened at 3 cre
 - **AND** no prestige reset, sixth rank, or repeated final-rank upgrade is created
 
 ### Requirement: Freeze benefits at offering preparation
-Each newly prepared offering transaction SHALL retain the Keeper rank earned before that transaction and its complete recipient-specific benefit plan. Retries and restarts SHALL use that plan even if another quest advances the Keeper. The milestone-crossing quest SHALL NOT receive benefits from the rank it is about to unlock.
+Each prepared player offering SHALL retain its issuing Keeper, dimension-qualified chest source, issuer's pre-transaction earned rank, frozen recipients, and complete benefit plan. Recovery SHALL use that plan regardless of configuration changes or any Keeper's advancement. The milestone-crossing quest SHALL NOT receive the rank it will unlock.
 
 #### Scenario: A pending offering survives another rank advancement
 - **WHEN** an offering prepared at Awakened remains pending while another quest unlocks Warden
-- **THEN** the pending offering retains Awakened benefits
+- **THEN** the pending offering retains its issuing Keeper's Awakened benefits and original chest source
 - **AND** later offerings prepared after the advancement receive Warden benefits
 
 #### Scenario: The third completion awakens the Keeper
@@ -82,10 +82,10 @@ Keeper bonus player XP SHALL be 0, 5, 10, 15, or 20 points per recipient at rank
 #### Scenario: A communal Ascendant quest completes
 - **WHEN** its frozen eligible recipients are rewarded at rank 5
 - **THEN** each recipient receives 20 bonus XP points
-- **AND** the shared Keeper still earns only one completion credit
+- **AND** its issuing Keeper still earns only one completion credit and other Keepers receive none
 
 ### Requirement: Protect benefit ownership and uncertain delivery
-Blessings and bonus XP SHALL use the same frozen recipient ownership as base rewards: one target for personal quests and eligible online players captured at communal completion preparation. Benefit intent and delivery progress SHALL survive restarts. Missing, negative, or ambiguous mutation acknowledgements SHALL stop delivery without credit or blind replay.
+Blessings and bonus XP SHALL use frozen base-reward ownership: one personal target and eligible online communal recipients. With membership-based quests, eligibility SHALL be the issuing Keeper's online members, not another temple's members. Prepared recipients and delivery progress SHALL survive migration/restart. Unproven mutation acknowledgements SHALL stop delivery without credit or blind replay.
 
 #### Scenario: A player joins after communal preparation
 - **WHEN** a communal reward transaction was prepared for Alice and Bob and Carol joins before delivery finishes
@@ -98,7 +98,7 @@ Blessings and bonus XP SHALL use the same frozen recipient ownership as base rew
 - **AND** restart does not reissue the XP command or replace the captured benefit plan
 
 ### Requirement: Activate without inventing historical progress
-Keeper progression SHALL require explicit enablement and a stable verified world/temple binding. Activation of an existing world SHALL initialize zero Keeper XP without backfilling capped warm-up counters or resetting existing state. Existing active and pending quests SHALL retain their original reward obligations; successful completions after activation SHALL earn credit once.
+First activation SHALL require explicit enablement and verified world/temple identity, initializing only that Keeper at zero XP without backfilling warm-up counters or resetting state. Existing quests and pending rewards SHALL retain their original obligations and issuer; successful post-activation completions SHALL credit that Keeper once.
 
 #### Scenario: Existing quest state has warm-up progress and pending debt
 - **WHEN** Keeper progression is first enabled for that world's state
@@ -112,7 +112,7 @@ Keeper progression SHALL require explicit enablement and a stable verified world
 - **AND** saved Keeper progress and already prepared benefit obligations are retained rather than discarded
 
 ### Requirement: Expose earned progress separately from appearance
-Read-only Keeper status SHALL show world/temple binding, lifetime total, earned rank, next milestone or maximum-rank status, installed temple rank, and any blocked or uncertain upgrade. A rank advancement SHALL produce a best-effort player announcement only after durable credit; status SHALL remain authoritative if an announcement is interrupted.
+Read-only status SHALL identify the selected Keeper and show its binding, lifetime total, earned rank, next milestone or cap, evolution enablement, installed temple rank, and blocked/uncertain upgrade. Rank advancement SHALL produce a best-effort issuer-identified announcement only after durable credit; status SHALL remain authoritative if interrupted.
 
 #### Scenario: Decoration is blocked after a rank advancement
 - **WHEN** the Keeper has earned Warden but the temple remains at Awakened because a patch target was edited
@@ -131,3 +131,29 @@ Models SHALL NOT select Keeper XP, ranks, effect IDs, durations, bonus amounts, 
 - **WHEN** a read-only Keeper preview inspects the active temple and next milestone
 - **THEN** it reports the intended changes and safety blockers using read-only probes
 - **AND** world inventory, quest JSON, and settlement database checksums remain unchanged
+
+### Requirement: Preserve temple-owned identity during multi-Keeper integration
+Keeper identity SHALL remain bound to world identity, dimension, and original template minimum corner, independently of names or decorations. Integration SHALL preserve existing credits, installed ranks, upgrade intents, and frozen rewards under that identity. Only new Keepers SHALL start at zero; no copying, redistribution, or cross-temple synchronization SHALL occur.
+
+#### Scenario: A leveled original temple becomes one of several Keepers
+- **WHEN** multi-temple discovery finds original Keeper A at Warden and a new Keeper B
+- **THEN** A retains its credited quest IDs, earned and installed ranks, and pending operations
+- **AND** B starts at zero XP and Dormant without copying A's credit
+
+#### Scenario: Prepared rewards cross the integration boundary
+- **WHEN** A has a partially delivered offering and a partial or uncertain appearance upgrade during migration
+- **THEN** the original issuer, source, recipients, prepared rank/action order, acknowledged progress, and uncertainty are retained
+- **AND** neither rewards nor decoration steps replay or reset
+
+### Requirement: Separate player rank credit from village prosperity
+Player rank XP and local village-benefit credit SHALL remain distinct. Once village benefits are available, one fully successful player completion SHALL credit its issuer's enabled rank and village benefit once each in the same durable completion commit. NPC completions SHALL credit village benefits only; assistance and historical backfill SHALL not create rank or prosperity credit.
+
+#### Scenario: A villager completes an NPC offering
+- **WHEN** the villager's exchange fully succeeds at A
+- **THEN** A can receive its bounded village benefit credit without changing A's rank XP
+- **AND** no player reward or other Keeper's credit is granted
+
+#### Scenario: Player completion is recovered after village integration
+- **WHEN** a pending player quest becomes fully successful for A
+- **THEN** A's lane progress, enabled rank XP, and applicable village credit commit once together
+- **AND** replay cannot advance either ledger and earlier completed quests are not backfilled

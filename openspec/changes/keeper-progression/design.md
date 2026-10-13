@@ -31,20 +31,20 @@ Observed integration points:
 
 ## Decisions
 
-### 1. One additive Keeper record in quest JSON
+### 1. Temple-owned Keeper records in quest JSON
 
-Add a versioned Keeper record to `State`, containing:
+Add versioned `State.keepers[keeper_id]` records using the same contract as the later `temple-keepers-and-village-blessings` change. This change operates the original registered temple only, with fully functional levels, rewards, preview, and upgrades; it does not create placeholder NPC or multi-temple discovery paths.
 
-- Immutable binding: stable admin-selected `world_id`, dimension `minecraft:overworld`, approved root resource, temple minimum corner, facing, configured chest, and decoration-definition digest.
-- `credited_quest_ids`: validated unique quest IDs completed while enabled. Keeper total is the number of these IDs and rank is derived from the fixed policy; do not persist an independent total that can drift from the ledger.
-- `installed_rank`, initially 1 after baseline enrollment; `last_announced_rank` for best-effort at-most-once rank notices.
-- Optional `upgrade`: milestone/predecessor, definition/geometry snapshot, ordered exact transitions, next step, dispatch uncertainty, status, and bounded error/evidence.
+- `keeper_id`: a canonical, unambiguous encoding of `(world_id, dimension, original full template minimum corner)`, allocated once and persisted. Names, ranks, decoration digests, and retry attempts are not identity inputs.
+- `binding`: stable admin-selected `world_id`, dimension `minecraft:overworld`, approved root resource, minimum corner, facing, designated chest, and decoration-definition digest. The root's translated placement anchor is not the minimum corner.
+- `progression`: validated unique `credited_quest_ids` from fully successful player quests while enabled, plus `last_announced_rank`. Total is the number of these IDs and earned rank is derived from the fixed policy; no independent total can drift from this ledger.
+- `evolution`: explicit per-temple enablement, `installed_rank` initially 1 after baseline enrollment, and optional `upgrade` containing milestone/predecessor, definition/geometry snapshot, exact transitions, progress, uncertainty, status, and bounded evidence.
 
-A successful completion adds its ID, advances the existing capped lane counter, makes that lane due, removes its active/pending quest, and saves once. Reject credited IDs before inventory inspection or preparing another reward. If that save fails, stop the writer rather than continue with an in-memory-only completion.
+All players completing this Keeper's quests share its progression. Another temple has its own independent ledger/rank. A successful player completion credits only its immutable issuer, advances the existing lane counter, makes that lane due, removes its active/pending quest, and saves once. Reject credited IDs before preparing another reward. If that save fails, stop the writer rather than continue with an in-memory-only completion.
 
 The ledger is deliberately append-only for exact duplicate rejection. It is not a new quest-history subsystem. JSON rewrite cost grows with completed quests; record that limit rather than prematurely adding SQLite or pruning idempotency evidence.
 
-Activation initializes an empty ledger, not the capped warm-up totals. Existing active quests complete normally and earn credit if successful after activation. Existing pending rewards keep their old rewards; successful post-activation resolution earns one credit. An unresolved migrated operation earns nothing. Disabling the feature pauses new credit/benefits/decorations but preserves the record and finishes only already frozen reward obligations without silently losing debt.
+First activation initializes only the original Keeper's empty ledger, not the capped warm-up totals. Existing active quests complete normally and earn issuer credit if successful after activation. Existing pending rewards keep their old rewards; successful post-activation resolution earns one credit. An unresolved migrated operation earns nothing. Later NPC/multi-temple migration preserves this Keeper's ledger and evolution record and initializes only newly discovered Keepers at zero. Disabling progression pauses new credit/benefits/decorations but preserves records and finishes only already frozen reward obligations without silently losing debt.
 
 Alternative rejected: reuse settlement XP. It is optional, has different levels/rewards, and would couple Keeper behavior to a disabled production subsystem.
 
@@ -62,17 +62,17 @@ The user confirmed the five thresholds, protection/utility powers, and player XP
 
 Use XP **points**, not extra levels, on top of the existing tier-dependent base XP-level command. Do not change `REWARDS`, settlement rewards, candidate bands, quantities, or progression scores. Use amplifier zero for level-I effects and vanilla effect merging, without `effect clear`, per-tick renewal, or an aura. Verify stronger active-effect preservation and same-effect refresh on Java 26.3 before accepting the implementation.
 
-Freeze the currently earned rank when creating `PendingReward`. This keeps an offering's entitlement stable while settlement jobs or another lane complete. A third completion prepared at Dormant unlocks Awakened but receives no retroactive Awakened benefits. All later transactions use the earned rank, even if appearance is blocked.
+Freeze the issuing Keeper's currently earned rank when creating `PendingReward`. This keeps an offering's entitlement stable while settlement jobs or another lane complete; another Keeper's rank never affects it. A third completion prepared at Dormant unlocks that Keeper's Awakened rank but receives no retroactive benefits. Later transactions use their issuer's earned rank even if its appearance is blocked. Rank-based player rewards remain independent of later local villager blessings and hostile wards.
 
 Alternatives rejected: harder-quest weighting, a per-recipient multiplier, or bonus levels; these would change the shared-growth/economy decisions. Native statue blocks are unnecessary for this policy.
 
 ### 3. Migrate to one frozen reward plan and one executor
 
-Extend pending rewards with a versioned list of typed, trusted actions sufficient to reproduce the base item reward, base levels, Keeper XP points/effects, and completion notifications for the captured recipients. Validate action kinds, IDs, amounts, and recipient names against the code-owned policy; do not accept arbitrary reward commands from saved/model input.
+Add immutable `keeper_id` to quests and pending operations, and freeze each pending source as issuer ID, dimension, and exact chest position. Extend pending rewards with a versioned list of typed, trusted actions reproducing base rewards, Keeper bonuses/effects, and notifications for captured recipients. Validate action kinds, IDs, amounts, and names against code-owned policy; saved/model input cannot supply arbitrary commands or choose another Keeper's rank/source.
 
-At preparation, freeze the original base choice, earned Keeper rank, recipients, and complete action ordering before consumption. Keep non-idempotent item/XP actions ahead of notifications. Execute from persisted progress using the existing persist-before-dispatch uncertainty discipline. Match actual Java 26.3 acknowledgement formats for the new XP/effect operations; no empty-response or generic-success fallback. Definite failures do not credit completion; ambiguous dispatched actions remain uncertain and must not replay. Stronger-effect merge/no-change responses need an explicit verified acceptable outcome rather than an invented success match.
+At preparation, freeze issuer, dimension-qualified source, original base choice, issuer's earned rank, recipients, and complete action ordering before consumption. Source inspection/consumption and recovery use that frozen chest rather than mutable global settings. Keep non-idempotent item/XP actions ahead of notifications. Execute from persisted progress using existing uncertainty discipline. Match actual Java 26.3 acknowledgements for new XP/effects; no empty/generic-success fallback. Definite failures do not credit completion; ambiguous actions remain uncertain without replay. Stronger-effect merge/no-change outcomes require verified handling.
 
-On loading an unversioned pending record, materialize precisely its old `vanilla_commands` sequence as typed actions using its existing quest, choice, recipients, `vanilla_step`, and `vanilla_uncertain`. Do not append Keeper benefits or reorder already prepared actions. Migrate all records to the new representation and use one executor afterwards; remove the old regeneration path rather than retain a legacy executor. Check progress against the frozen plan length, not a stale fixed command count. Dry-run migration stays in memory.
+On loading an unversioned pending record, establish its original verified source from saved consumption commands/fingerprint and matching configuration/world evidence; an ambiguous source stops affected migration. Attach the original `keeper_id` and materialize precisely its old `vanilla_commands` sequence as typed actions using existing quest, choice, recipients, progress, and uncertainty. Do not append benefits, resnapshot recipients/rank, or reorder prepared actions. Use one executor afterwards and remove the old regeneration path. Check progress against frozen plan length. Dry-run migration stays in memory.
 
 The existing settlement `recorded`, XP, structure-step, and ownership obligations remain intact. Keeper credit occurs only after both the frozen reward plan and those existing obligations succeed. When Keeper is enabled, any uncertain reward prevents the completion commit and reports reconciliation; it does not silently pay again.
 
@@ -82,7 +82,7 @@ Alternative rejected: regenerate commands from current rank every poll. Rank adv
 
 Proposed configuration surface follows the existing environment pattern:
 
-- `DIRECTOR_KEEPER_ENABLED=1` activates new progression and evolution; default is off.
+- `DIRECTOR_KEEPER_ENABLED=1` activates rank progression; default is off. In this single-temple change, explicit verified registration opts the original temple into evolution and persists that decision in its Keeper record. Later discovery alone leaves each new temple's evolution disabled.
 - `KEEPER_WORLD_ID`: stable opaque identity for this world, retained across restarts and never used as a retry switch.
 - `KEEPER_TEMPLE_RESOURCE`: approved manifest root ID.
 - `KEEPER_TEMPLE_MIN_X/Y/Z`: actual full template minimum corner, including the floor, not the quest hub or a translated placement anchor.
@@ -95,11 +95,15 @@ Once enrolled, binding/digest disagreement fails closed without replacing the re
 
 Default-off deployment is a safe cutover, not a compatibility alias. An existing state file without Keeper data loads with zero progress when deliberately enabled. A dry-run computes prospective enrollment without saving it. Starting with malformed/inconsistent enabled configuration is an actionable startup failure before inventory mutation.
 
+Automatic discovery, membership-based communal eligibility, and independent lanes for additional temples are added by the NPC change, not this implementation. The later registry must resolve the original temple to the already persisted `keeper_id` and binding, never re-enroll it from baseline or derive a second identity from its upgraded decoration. Renaming or introducing the Keeper must preserve its level.
+
 ### 5. Derive small patch assets from the actual roots
 
 Add a separate, versioned `config/keeper_temples.json` generated by an explicit authoring option in `tools/village_temples.py`; keep `--check` read-only. Do not alter the bundled generation NBT, pools, weights, processors, or baseline temple manifest merely to enable progression.
 
 Each of the 32 root definitions records template size/floor, chest/entry, required no-touch/access cells, and ordered rank transitions with unique local positions, complete expected and target states, and necessary supports. Select processor-stable target cells so both normal and abandoned roots remain eligible without treating weathered blocks as clearable terrain. Derive coordinates from the existing real root/feature records, not repository example world positions.
+
+Also record invariant identification cells separately from rank-mutable decoration. These allow later provenance-backed discovery to recognize every authorized installed rank and a recorded acknowledged partial upgrade without requiring baseline idol/lighting blocks. They do not authorize repair, arbitrary lookalikes, or bypass uncertain dispatch.
 
 Author cumulative visual stages:
 
@@ -142,6 +146,16 @@ Report binding, completion total, earned/installed ranks, next threshold, due st
 
 After a successful completion commit, announce rank advancement and its powers using the existing Keeper tellraw style. Persist the notice watermark before dispatch for best-effort at-most-once delivery; a crash can lose a cosmetic notice but must not replay rewards. Public status remains authoritative. Do not add scoreboard objectives, signs, holograms, a chat-command parser, or a notice outbox framework.
 
+### 8. Levels-first integration contract
+
+Implement and accept this single-temple levels feature first. Rebase the later multi-temple/NPC implementation onto that accepted source, then extend `State.keepers[keeper_id]` with name, personality, membership, Keeper-owned lanes, and a separate `prosperity` record. Keep `binding`, `progression`, and `evolution` intact. Use sequential versioned migration in the existing state-save convention, not two competing migrations or reward executors.
+
+Use the issuing Keeper and existing player `quest_id` as the stable player completion identity; keep existing SQLite idempotency keys unchanged. After multi-temple integration, one final successful JSON completion commit advances the issuer's lane, rank ledger, and newly applicable village-benefit ledger once each. NPC prosperity keys additionally identify actor kind and operation ID; they never enter `progression.credited_quest_ids`. Assistance grants create neither credit. Do not backfill village benefits from previously credited player IDs.
+
+The NPC migration preserves frozen sources/recipient lists, prepared rank/action ordering, acknowledged indices, uncertainty, credit IDs, installed ranks, evolution enablement, and exact partial-upgrade snapshots. Historical communal recipients remain unchanged; membership applies only to new preparations. New Keepers start at zero, with evolution off until explicit per-temple opt-in. No rank sync, copying, or redistributing old credit.
+
+Discovery checks invariant identifying cells or the trusted installed/intermediate appearance for an existing binding. An ordinary decoration blocker is not a missing-chest condition. Invalid chest/access suspends its temple; uncertain dispatched mutation retains the stricter writer-stop/reconciliation rule. NPC rituals must not overlap an active decorative upgrade at the same temple or erase its reservation/uncertainty.
+
 ## Risks / Trade-offs
 
 - Vanilla RCON cannot atomically protect a multi-block patch from external edits -> exact guards on each command, preflight/postflight verification, and externally protected decorative cells during execution. Director guards are not player/plugin permission enforcement.
@@ -157,7 +171,7 @@ After a successful completion commit, announce rank advancement and its powers u
 
 ### Implementation and isolated acceptance
 
-1. Implement state/plan migration and rank policy without enabling it by default; keep existing offering and settlement regressions intact.
+1. Implement the original temple's complete levels/state/frozen-plan feature first, using the shared temple-owned identity contract without NPC dependencies; keep existing offering and settlement regressions intact and progression disabled by default.
 2. Author/validate the separate patch manifest against real bundled roots, including all cumulative ranks and intermediate prefixes in four rotations.
 3. Exercise the frozen benefit plan and read-only CLI against isolated fixtures; run the standard unittest suite and existing admin help smoke.
 4. Use a disposable vanilla Java 26.3 world containing a generated baseline temple, with an isolated quest state and exactly one writer. Do not modify or regenerate the designated deployment or unrelated family/test worlds.
@@ -169,7 +183,7 @@ After a successful completion commit, announce rank advancement and its powers u
 1. Ship reviewed implementation through the normal topic-branch PR workflow. No production activation is authorized by this planning request or its implementation checklist.
 2. For a later authorized activation, stop the Keeper writer, take verified paired world/state/configuration backups using the established maintenance sequence, and inspect the real generated root, rotation, minimum corner, current chest, and decorative cells.
 3. Install reviewed patch-definition copies and explicit opt-in binding without changing spawn, chest, seed, world identity, terrain, existing progression, settlement enablement, admission policy, or LLM configuration.
-4. Run read-only status/preview with writer stopped and compare quest/SQLite checksums. Activation starts with zero credits and no automatic rank-1 reconstruction.
+4. Run read-only status/preview with writer stopped and compare quest/SQLite checksums. First activation starts that Keeper at zero without rank-1 reconstruction; subsequent multi-temple integration preserves all earned progress, appearance, enablement, and pending intent instead of reactivating it from zero.
 5. Start exactly one writer after acceptance. Python changes require a Keeper restart; restart Minecraft only when actually needed. Check effective binding and startup logs without printing secrets.
 
 ### Recovery and rollback

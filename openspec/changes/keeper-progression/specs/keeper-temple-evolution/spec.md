@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Make the active Keeper temple visibly reflect earned rank through explicitly enabled, persistent decorative milestones that preserve offerings, access, player edits, and unrelated villages.
+Make each opted-in Keeper temple reflect its own earned rank through persistent decorative milestones that preserve offerings, access, player edits, and independent progress at unrelated temples.
 
 ## ADDED Requirements
 
-### Requirement: Register one verified active temple explicitly
-Runtime evolution SHALL require one admin-selected temple bound to a stable world identity, supported Java 26.3 root variant, minimum-corner position, facing, and versioned decoration definition. Its transformed offering-chest position SHALL match the configured quest chest. The Director SHALL NOT discover, relocate, or upgrade other temples automatically.
+### Requirement: Register verified temple evolution explicitly
+Evolution SHALL require explicit per-temple opt-in and a binding to its stable Keeper identity, Java 26.3 root variant, minimum corner, facing, and decoration definition. Its transformed chest SHALL match its quest source. The initial levels feature SHALL operate only the original registered temple; later discovery SHALL neither enable evolution nor authorize another temple's upgrades.
 
 #### Scenario: Registration matches a generated temple
 - **WHEN** the registered root variant and facing reproduce the configured chest and baseline temple geometry
@@ -19,8 +19,13 @@ Runtime evolution SHALL require one admin-selected temple bound to a stable worl
 - **THEN** mutation is rejected with the conflicting binding reported
 - **AND** progress is not reset and an alternative temple is not selected
 
+#### Scenario: Another Keeper is discovered later
+- **WHEN** multi-temple discovery registers Keeper B while A has opted into evolution
+- **THEN** B's evolution remains disabled and A retains its existing enablement and installed rank
+- **AND** B's discovery or rank does not install decorations at either temple
+
 ### Requirement: Installing assets does not activate retrofits
-Installing code, decoration definitions, or the generation pack SHALL NOT itself change already generated temples. Explicit Keeper enablement and verified registration SHALL be required before runtime evolution. Generation roots, village selection, spawn, and offering-chest location SHALL remain unchanged by this feature.
+Installing code, decoration definitions, or the generation pack SHALL NOT itself change existing temples. Explicit evolution enablement and verified registration for that Keeper SHALL be required. Generation roots, village selection, spawn, and chest locations SHALL remain unchanged.
 
 #### Scenario: Updated assets are installed without activation
 - **WHEN** the Director runs with Keeper evolution disabled
@@ -88,7 +93,7 @@ Milestone identity, bound geometry, expected/target states, dispatch progress, a
 - **AND** an acknowledgement that cannot distinguish the outcome leaves a protected uncertain record
 
 ### Requirement: Advance appearance only after exact verification
-Installed temple rank SHALL advance only when every step of that milestone is acknowledged and the complete authored decorative state plus access invariants are verified. Several earned milestones SHALL be installed in predecessor order. Ordinary blocked upgrades SHALL retain earned Keeper rank and allow safe quest completion to continue.
+A temple's installed rank SHALL advance only after all its milestone steps and complete target/access state are verified. Its earned milestones SHALL install in predecessor order without borrowing another Keeper's rank. Ordinary decoration blockers SHALL retain earned progress and allow safe quests; actual chest/access failures SHALL suspend affected source activity.
 
 #### Scenario: Two milestones are due
 - **WHEN** earned rank is Exalted and installed appearance is Awakened
@@ -107,6 +112,14 @@ Saved milestone appearances SHALL persist through world saves, chunk unloads, an
 - **WHEN** a player modifies a completed statue and the Director restarts
 - **THEN** that edit remains intact and Warden is not reapplied
 - **AND** a subsequent dependent milestone is blocked if the edited statue violates its expected predecessor
+
+### Requirement: Preserve identity across authorized appearances
+Authorized milestones and recorded partial upgrade states SHALL retain the original Keeper identity and source. Provenance-backed discovery SHALL recognize them using invariant identifying cells or trusted rank-aware geometry, not demand a baseline idol/lighting pattern. Recognition SHALL NOT mark an uncertain operation complete, repair player edits, or create another Keeper.
+
+#### Scenario: Discovery revisits an upgraded original temple
+- **WHEN** later multi-temple discovery verifies A's provenance, invariant cells, and chest after a Warden upgrade
+- **THEN** it resolves the original A identity with its saved installed rank rather than enrolling a new Keeper
+- **AND** valid sculptures or an ordinary decorative blocker do not falsely report the chest as damaged
 
 ### Requirement: Provide read-only previews and paired recovery
 A preview SHALL report the binding, earned/installed ranks, next ordered milestone, intended block transitions, and safety blockers without persistent writes. Uncertain recovery SHALL require stopped writers, paired world/quest-state backups, inspection of exact operation records and blocks, and deliberate offline reconciliation; resets, blind retries, or identity changes SHALL NOT substitute for recovery.
