@@ -14,6 +14,13 @@ Evolution SHALL require explicit per-temple opt-in and a binding to its stable K
 - **THEN** that temple is eligible for guarded evolution
 - **AND** all other village temples remain unchanged
 
+#### Scenario: Native street assembly differs from raw-template terrain
+- **WHEN** untouched Java 26.3 generation leaves paths, grass, or plants in the street-owned outer connector fringe
+- **THEN** enrollment verifies the exact authored internal road-to-altar support and clearance rather than demanding raw-template states in that native street fringe
+- **AND** temple identity, stairs, chest/lid, and all decorative predecessor/target states remain exact
+- **AND** no street terrain is cleared, adopted as a mutation target, or repaired
+
+
 #### Scenario: Registration or durable binding disagrees
 - **WHEN** chest coordinates, world identity, geometry, or decoration definition differ from the durable binding
 - **THEN** mutation is rejected with the conflicting binding reported

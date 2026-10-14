@@ -329,6 +329,250 @@ joining was not exercised; client rendering/access proof remains the isolated
 vanilla session described above. Unrelated servers and reconciliation snapshots
 were not changed.
 
+## Independent Keeper levels and temple evolution
+
+Keeper progression is **off by default**, works with settlements disabled, and
+uses the existing quest JSON rather than SQLite. Each temple's Keeper has its
+own progression shared by all players using that Keeper. One fully successful
+personal or communal quest earns **one Keeper XP**, regardless of recipient
+count. Pending, uncertain, retired, or duplicate completions earn nothing.
+Existing quest warm-up counters and settlement XP are separate and are never
+converted into Keeper XP.
+
+| Rank | Keeper XP threshold | Bonus player XP points | Haste I | Resistance I |
+| --- | ---: | ---: | ---: | ---: |
+| Dormant | 0 | 0 | none | none |
+| Awakened | 3 | 5 | 30 seconds | none |
+| Warden | 10 | 10 | 60 seconds | 30 seconds |
+| Exalted | 25 | 15 | 90 seconds | 60 seconds |
+| Ascendant | 50 | 20 | 120 seconds | 90 seconds |
+
+Bonus XP uses **points**, in addition to the unchanged base reward of two
+experience **levels** per reward tier and the existing item choice. Vanilla
+point gains can themselves cross a level boundary. Effects use amplifier zero,
+normal vanilla merging, and no aura, periodic refresh, or effect clearing.
+A stronger existing effect is preserved; a no-change reply is accepted only
+after checking the actual matching effect's strength and remaining duration.
+
+Preparation freezes the issuer, exact dimension-qualified normal chest,
+recipients, base choice, earned rank, and typed action sequence **before
+consumption**. A milestone-crossing offering receives its original rank's
+benefits; only subsequent preparations get the new rank. Another Keeper's rank,
+later progression, configuration edits, restart, and temporarily disabled
+progression do not reinterpret prepared debt. Personal rewards target only the
+assigned player; communal rewards target the eligible online recipients captured
+at preparation.
+
+Unversioned pending operations migrate to their exact old action order and
+dispatch indices, without added blessings or bonus points. An ambiguous legacy
+source blocks dispatch, even with levels disabled. Never infer a source from a
+new chest setting or retry an uncertain payment. Item, XP, effect, and offering
+mutations persist uncertainty before dispatch; lost or unrecognized replies
+retain reconciliation debt. The final completion save commits Keeper credit,
+lane progress, and removal of the pending operation together. A failed durable
+save stops the writer.
+
+### Explicit original-temple binding
+
+This implementation operates only the explicitly registered original temple:
+no NPCs, discovery loop, or automatic enrollment of other temples.
+
+| Environment variable | Contract |
+| --- | --- |
+| `DIRECTOR_KEEPER_ENABLED` | Default `0`; `1` enables new progression, powers, and the selected temple's evolution. |
+| `KEEPER_WORLD_ID` | Required stable identity of the matching world; never change it to retry. |
+| `KEEPER_TEMPLE_RESOURCE` | Required exact root ID in the approved definitions. |
+| `KEEPER_TEMPLE_MIN_X`, `_Y`, `_Z` | Required integer **full template minimum corner**, including its floor; not spawn, hub, chest, or translated placement anchor. |
+| `KEEPER_TEMPLE_FACING` | Required `north`, `east`, `south`, or `west`. |
+| `KEEPER_TEMPLE_DEFINITIONS` | Default `config/keeper_temples.json`; trusted authored exact-state definitions. |
+| `OFFERING_CHEST_X`, `_Y`, `_Z` | Must equal the selected root's transformed normal chest. |
+
+Facing rotates both positions and directional block states: north is `none`,
+east `clockwise_90`, south `clockwise_180`, west `counterclockwise_90`.
+For the vanilla template command, the half-turn spelling is `180`, not the
+internal rotation name. Derive coordinates from the actual saved generated
+root/rotation and inspect the current world; repository/live example coordinates
+are not defaults for another temple.
+
+First enrollment verifies the baseline decoration, invariant identity cells,
+stairs/road approaches, altar/chest access, and clear chest-lid space. It saves
+an empty ledger and explicit evolution opt-in. Existing enrollment preserves
+earned/installed progress and never reinterprets the upgraded temple as rank 1.
+Binding or selected-definition digest conflicts reject startup instead of
+resetting identity, rebinding geometry, or clearing the world. Settlement
+`protected_regions` also prohibit overlapping evolution even when settlements
+are disabled.
+
+Activation on a persistent deployment requires separate authorization, stopped
+writers, matched world/state/configuration backups, and a reviewed source update.
+This change does **not** activate production, install a new generation pack, move
+the chest/hub, change the seed, or regenerate any existing world.
+
+### Guarded cumulative appearances
+
+Awakened adds pedestal lanterns; Warden adds two static waxed-copper,
+block-built golem sculptures; Exalted embellishes the existing stone idol and
+column capitals; Ascendant adds supported hanging lights and brightens the sun.
+These are sculptures, not living copper golems or native statue block entities.
+Generation NBT, pools, processors, the chest, original lights, and routes remain
+unchanged.
+
+Earned rank and **installed appearance** are separate. Director processes due
+milestones in order after ordinary quest work, with at most 16 block mutations
+per Director tick. Every command requires loaded temple chunks, no player
+anywhere in the full temple bounds, and the exact expected block state; its
+exact acknowledgement and target readback must both match. Recorded predecessor
+and acknowledged-prefix states must still match before any unsent suffix resumes.
+There is no clearing, whole-template replacement, repair, or overwrite fallback.
+
+A changed decorative cell, player, unavailable chunk, or protected region
+normally blocks appearance without losing earned progression or future rewards.
+An invalid chest/invariant/access cell suspends source work instead. A dispatched
+but unacknowledged decoration remains **uncertain** and stops the writer; startup
+must not replay it. Installed rank commits only after complete cumulative
+postflight verification. Subsequent player edits are not repaired automatically.
+
+Vanilla RCON cannot lock external edits atomically. Protect the temple from
+players, plugins, and other commands during upgrades. For uncertainty, stop all
+writers, preserve matched world/quest JSON/optional SQLite/configuration backups,
+inspect actual blocks/inventory and the frozen record, then reconcile only the
+verified operation offline. Never delete debt, reset IDs/ranks, modify digests,
+or change the expected template to manufacture a retry.
+
+### Read-only inspection and patch authoring
+
+With the verified configuration/RCON environment supplied privately:
+
+```bash
+python3 -B keeper_admin.py --state "$DIRECTOR_STATE" show
+DIRECTOR_DRY_RUN=1 python3 -B keeper_admin.py --state "$DIRECTOR_STATE" preview
+python3 -B keeper_admin.py --help
+```
+
+`show` needs no server or password. It lists each saved Keeper independently;
+`show --keeper-id <id>` selects one. `preview` inspects only the explicitly
+configured original temple and reports earned/installed rank, next milestone,
+exact transitions, and blockers. Both emit JSON on stdout, diagnostics on stderr,
+and force read-only mode before import-time migration. They neither start a
+Director/LLM/discovery loop nor save enrollment, migration, errors, or upgrades.
+Use read-only world/state mounts for operational previews.
+
+```bash
+# Read-only checks: neither command authors or installs assets.
+python3 -B tools/village_temples.py --check
+python3 -B tools/village_temples.py --check-keeper-patches
+
+# Explicit authoring only: regenerate the trusted patch manifest, not world blocks.
+python3 -B tools/village_temples.py --write-keeper-patches
+```
+
+The patch checker uses the real 32 bundled roots and processor outcomes,
+validating 128 rotations, 640 cumulative appearances, and 8,448 mutation
+prefixes. Skipped `structure_void` jigsaw cells are not literal world identity
+probes. Do not edit definitions in place for an enrolled/upgrading temple:
+the persisted selected-definition digest and frozen transitions are authority.
+
+Native street/terrain assembly owns the connector and its two inward columns.
+Exact source-access probes use the supported internal plaza route, starting
+three columns inward, rather than requiring raw-template floor/air states in
+that street-owned fringe. Untouched same-seed Java 26.3 generation reproduced
+the live dirt-path/grass/short-grass differences; corrected enrollment and a
+guarded upgrade preserved those cells. Interior stairs/support/headroom,
+chest/lid, invariant identity, and all decorative mutations remain exact.
+No generation assets, live blocks, or accepted mutation states were changed.
+
+### Later NPC integration
+
+The later `temple-keepers-and-village-blessings` change extends this state rather
+than replacing it. Keeper identity is `keeper:` plus SHA256 of compact JSON
+`[world_id, dimension, original_min_x, original_min_y, original_min_z]`.
+Quest JSON schema 2 stores Keeper record version 1: `binding`,
+`progression.credited_quest_ids`/`last_announced_rank`, and `evolution`.
+The ledger's length determines XP; no independent total is inferred.
+
+Preserve the original identity, ledger, evolution opt-in, installed rank,
+frozen upgrade definition/transitions/prefix/uncertainty, and frozen pending
+`keeper_id`, `source`, `recipients`, `reward_rank`, `reward_plan`, and all existing
+dispatch/settlement fields. Newly discovered Keepers start with zero credits and
+evolution disabled until explicitly enrolled. NPC quest history/village prosperity
+is separate: it cannot earn Keeper XP or advance player warm-up counters.
+Do not replay historical village credit or downgrade to old code against new debt.
+
+NPC migration must explicitly extend versioned validation, not add fields to
+the current strict record schema or recompute frozen debt. Keep
+`consumption_step`/`consumption_uncertain`, `vanilla_step`/`vanilla_uncertain`,
+the original consumption commands/fingerprints/source snapshot, and
+`recorded`/`xp_done`/`structures_done` settlement obligations. Review used the
+actual original's rank-5/51-credit record, its matched rank-3-in-progress
+16-of-22 checkpoint, and current-format round-trip preservation of a frozen
+rank-5 uncertain debt fixture. This verifies the levels handoff format, not a
+future NPC migration or discovery implementation; NPC tasks 1.0, 2.1, and 3.1
+must still exercise their real cutover against these invariants.
+
+### Isolated implementation evidence and limits
+
+Keeper progression was exercised on a **new disposable Java 26.3 server**,
+not either designated deployment. Settlements and NPCs were disabled; no LLM
+was called. The naturally generated original plains temple retained its normal
+chest and binding through 51 controlled offerings, with both player lanes,
+all four rank boundaries, all five appearances, and an unchanged second
+Keeper's zero-credit record. These were administrator-controlled offering
+fixtures, not proof of natural supply-backed quest opening: the observed nearby
+crops were below the opening minimum and were not fabricated or relocated.
+
+Actual recipient state confirmed 0/5/10/15/20 bonus **points**, unchanged base
+item/level rewards, private ownership, communal recipients, stronger finite and
+infinite effects, and rank frozen before milestone-crossing consumption.
+Unrelated chest items survived. Duplicate completion after reload changed
+neither state, inventory, XP, nor credits. A blocked appearance still allowed
+subsequent earned progression. A real save/server restart retained the
+acknowledged 16-of-22 rank-3 prefix and resumed only its six unsent transitions;
+rank 5 likewise required two bounded ticks (16 then 8 transitions).
+
+Separate owned authoring fixtures exercised a chest inserted into a decoration
+cell (contents preserved), a player entering **after** inspection (native guard
+prevented mutation), and a lost reply **after an actual successful setblock**.
+Both uncertain cases retained step zero and refused restart/replay. The actual
+Director loop continued on an ordinary decoration blocker and returned exit 2
+for uncertain dispatch. An unloaded-chunk command produced no mutation
+acknowledgement. These fixtures and matched world/state recovery data were
+retained; they are not a reason to reset or repair an uncertain live operation.
+
+A separate runtime matrix upgraded **40 controlled assets**: one normal and one
+abandoned root per village style, each in all four facings. All 18 unique approved
+target states were observed, with 2,640 exact final-cell probes. This is distinct
+from the full saved-NBT matrix of 32 roots/128 rotations/640 appearances/8,448
+prefixes; not all 128 combinations were live-tested. Raw `place template`
+authoring required finalizing the trusted roots' original jigsaw final states
+top-down (including path substrate affected by temporary raw jigsaws). This was
+test-asset preparation, not a runtime repair, template-replacement fallback,
+or proof of naturally generated abandoned villages.
+
+The integrated unittest run passed **177 tests**. Baseline/patch CLI checks,
+explicit patch authoring to a temporary output (byte-identical to the checked-in
+manifest), both admin help commands, JSON `show`/`preview`, and read-only mounted
+preview were exercised. Quest JSON and optional SQLite checksums remained
+unchanged around inspection.
+
+Vanilla-client captures observed each appearance, the paired static waxed-copper
+sculptures' faces/noses/shoulders/legs, and personal/communal effect ownership
+and expiry. A survival client walked from ground level up the stairs to the
+altar and opened the existing chest; its offering/unrelated items were unchanged.
+A final actual server restart preserved original rank-5 blocks, binding, credits,
+player XP/inventory, the deliberately edited decoration, and uncertain records.
+Those clients used **offline disposable test identities**, not authenticated
+production players. Authenticated-client acceptance remains incomplete; these
+results do not claim production joining or quest completion.
+No production activation, existing-world regeneration, NPC implementation, or
+unrelated-container changes were performed.
+
+Local captures, the 51 recipient before/after observations, palette/dispatch
+evidence, and paired recovery archives are retained under the ignored private
+`.runtime/keeper-smoke/` directory. The disposable server and its two clients were
+stopped after acceptance; no Director writer was left running. Throwaway smoke
+programs and the duplicate authored manifest were removed. Retain the matched
+backups and uncertain fixtures if the disposable world is inspected again.
+
 ## Safely enable settlements
 
 1. Back up the Minecraft world and Director state.

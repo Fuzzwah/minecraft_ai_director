@@ -38,6 +38,8 @@ from typing import Optional
 
 from quest_supply import (AnvilWorldReader, PlayerProfile, SupplySnapshot, build_profile,
                           parse_inventory_slots, parse_player_items)
+from keeper import (KeeperController, KeeperError, KeeperUncertain, credit as keeper_credit,
+                    keeper_id, policy as keeper_policy, rank as keeper_rank, validate_records)
 
 
 # ----------------------------- configuration -----------------------------
@@ -88,6 +90,13 @@ DRY_RUN = os.getenv("DIRECTOR_DRY_RUN", "0") == "1"
 STRUCTURES_PATH = Path(os.getenv("DIRECTOR_STRUCTURES", "config/structures.json"))
 SETTLEMENT_PATH = Path(os.getenv("DIRECTOR_SETTLEMENT", "config/settlement.json"))
 DATABASE_PATH = Path(os.getenv("DIRECTOR_DATABASE", "director_settlement.sqlite3"))
+KEEPER_ENABLED = os.getenv("DIRECTOR_KEEPER_ENABLED", "0") == "1"
+KEEPER_DEFINITIONS_PATH = Path(os.getenv("KEEPER_TEMPLE_DEFINITIONS", "config/keeper_temples.json"))
+STATE_VERSION = 2
+
+
+class StatePersistenceError(KeeperUncertain):
+    """A failed durable save stops all writers, including quest reward dispatch."""
 
 QUEST_CATALOG = {
     # Warm-up uses verified nearby yield; later bands are progression-gated.
@@ -248,6 +257,8 @@ class Quest:
     policy_version: int = 0
     mode: str = "legacy"
     reference_band: str | None = None
+    keeper_id: Optional[str] = None
+    source: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -266,6 +277,10 @@ class PendingReward:
     last_error: str = ""
     recipients: list[str] = field(default_factory=list)
     source_snapshot: dict = field(default_factory=dict)
+    keeper_id: Optional[str] = None
+    source: dict = field(default_factory=dict)
+    reward_rank: int = 1
+    reward_plan: Optional[list[dict]] = None
 
 
 @dataclass
@@ -281,10 +296,22 @@ class State:
     communal_completions: int = 0
     private_completions: dict[str, int] = field(default_factory=dict)
     private_issued: dict[str, int] = field(default_factory=dict)
+    keepers: dict[str, dict] = field(default_factory=dict)
+
+
+def strict_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON state key: {key}")
+        result[key] = value
+    return result
 
 
 def save_state(state: State) -> None:
     data = {
+        "state_version": STATE_VERSION,
+        "keepers": state.keepers,
         "active_quest": asdict(state.active_quest) if state.active_quest else None,
         "communal_quest": asdict(state.communal_quest) if state.communal_quest else None,
         "private_quests": {player: asdict(quest) for player, quest in state.private_quests.items()},
@@ -297,26 +324,32 @@ def save_state(state: State) -> None:
         "private_issued": state.private_issued,
     }
     tmp = STATE_PATH.with_suffix(STATE_PATH.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    # Atomic rename alone is not durable across a host crash.
-    with tmp.open("r+") as handle:
-        handle.flush()
-        os.fsync(handle.fileno())
-    tmp.replace(STATE_PATH)
-    directory_fd = os.open(STATE_PATH.parent, os.O_RDONLY)
     try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        # Atomic rename alone is not durable across a host crash.
+        with tmp.open("r+") as handle:
+            handle.flush()
+            os.fsync(handle.fileno())
+        tmp.replace(STATE_PATH)
+        directory_fd = os.open(STATE_PATH.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError as exc:
+        raise StatePersistenceError(f"Cannot durably save Director state: {exc}") from exc
 
 
 def load_state() -> State:
     if not STATE_PATH.exists():
         return State()
     try:
-        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        data = json.loads(STATE_PATH.read_text(encoding="utf-8"), object_pairs_hook=strict_json_object)
         if not isinstance(data, dict):
             raise ValueError("state must be an object")
+        if type(data.get("state_version", 0)) is not int or data.get("state_version", 0) not in (0, STATE_VERSION):
+            raise ValueError("unsupported Director state version")
+        keepers = validate_records(data.get("keepers", {}))
         communal_completions = load_counter(data.get("communal_completions", 0), maximum=3)
         private_completions = load_counter_map(data.get("private_completions", {}), maximum=3)
         private_issued = load_counter_map(data.get("private_issued", {}))
@@ -356,7 +389,7 @@ def load_state() -> State:
                 raise ValueError("invalid pending consumption commands")
             if reward.consumption_step > len(reward.consumption_commands):
                 raise ValueError("pending consumption progress exceeds commands")
-            if type(reward.vanilla_step) is not int or not 0 <= reward.vanilla_step <= 256:
+            if type(reward.vanilla_step) is not int or reward.vanilla_step < 0:
                 raise ValueError("invalid pending vanilla progress")
             if any(type(value) is not bool for value in (reward.consumption_uncertain, reward.vanilla_uncertain, reward.recorded, reward.xp_done)):
                 raise ValueError("invalid pending reward flags")
@@ -378,11 +411,17 @@ def load_state() -> State:
                       last_quest_at=last_quest_at, last_communal_quest_at=last_communal_quest_at,
                       private_quest_at=private_quest_at, pending_settlement_rewards=pending,
                       communal_completions=communal_completions,
-                      private_completions=private_completions, private_issued=private_issued)
+                      private_completions=private_completions, private_issued=private_issued,
+                      keepers=keepers)
         migrated = (legacy_private_submission(legacy_data)
                     or legacy_private_submission(communal_data)
                     or any(legacy_private_submission(raw) for raw in private_data.values())
                     or any(legacy_private_submission(entry.get("quest")) for entry in pending_data))
+        for reward in state.pending_settlement_rewards:
+            if reward.reward_plan is None:
+                freeze_pending_reward(reward, state, legacy=True)
+                migrated = True
+            validate_pending_reward(reward, state)
         if migrated and not DRY_RUN:
             save_state(state)
         return state
@@ -476,6 +515,7 @@ def load_saved_quest(raw: dict) -> Quest:
         raise ValueError("invalid saved quest timestamp")
     if not isinstance(quest.quest_id, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", quest.quest_id):
         raise ValueError("invalid saved quest ID")
+    validate_quest_source(quest)
     if not isinstance(quest.rewards, list) or len(quest.rewards) > 32:
         raise ValueError("invalid saved rewards")
     quest.rewards = [validate_reward_shape(reward) for reward in quest.rewards]
@@ -641,17 +681,122 @@ def parse_first_int(text: str) -> int:
     return int(match.group(1)) if match else 0
 
 
-def source_slots(quest: Quest) -> list[dict]:
-    if quest.submission == "offering_chest":
-        if any(value is None for value in OFFERING_CHEST):
-            raise ValueError("offering chest coordinates are not configured")
-        x, y, z = OFFERING_CHEST
-        block_id = rcon(f"execute if loaded {x} {y} {z} run data get block {x} {y} {z} id")
-        if "Test failed" in block_id or "minecraft:chest" not in block_id or "ender_chest" in block_id:
-            raise ValueError("configured offering source is not a loaded normal chest")
-        response = rcon(f"data get block {x} {y} {z} Items")
+def validate_source(source: dict, *, allow_empty: bool = True) -> None:
+    if source == {} and allow_empty:
+        return
+    if (not isinstance(source, dict) or set(source) != {"dimension", "position"}
+            or source["dimension"] != "minecraft:overworld"
+            or not isinstance(source["position"], list) or len(source["position"]) != 3
+            or any(type(value) is not int for value in source["position"])):
+        raise ValueError("invalid immutable offering source")
+    x, y, z = source["position"]
+    if not (-30_000_000 <= x < 30_000_000 and -64 <= y < 320 and -30_000_000 <= z < 30_000_000):
+        raise ValueError("offering source outside world bounds")
+
+
+def validate_quest_source(quest: Quest) -> None:
+    validate_source(quest.source)
+    if quest.keeper_id is not None and not re.fullmatch(r"keeper:[0-9a-f]{64}", quest.keeper_id):
+        raise ValueError("invalid quest Keeper identity")
+    if quest.keeper_id is not None and not quest.source:
+        raise ValueError("Keeper quest is missing its bound source")
+
+
+def configured_source() -> dict:
+    source = {"dimension": "minecraft:overworld", "position": list(OFFERING_CHEST)}
+    validate_source(source, allow_empty=False)
+    return source
+
+
+def quest_source(quest: Quest) -> dict:
+    validate_quest_source(quest)
+    return quest.source if quest.source else configured_source()
+
+
+def bind_quest(state: State, quest: Quest) -> None:
+    source = quest_source(quest)
+    if quest.keeper_id is not None:
+        record = state.keepers.get(quest.keeper_id)
+        if record is None or source != {
+            "dimension": record["binding"]["dimension"], "position": record["binding"]["chest"]
+        }:
+            raise KeeperError("quest issuer does not match its immutable chest source")
+    elif KEEPER_ENABLED:
+        matches = [key for key, record in state.keepers.items() if source == {
+            "dimension": record["binding"]["dimension"], "position": record["binding"]["chest"]
+        }]
+        if len(matches) != 1:
+            raise KeeperError("offering source does not identify the registered Keeper")
+        quest.keeper_id = matches[0]
+    quest.source = {"dimension": source["dimension"], "position": list(source["position"])}
+
+
+def keeper_controller(state: State, *, persist: bool = False) -> KeeperController | None:
+    if not KEEPER_ENABLED:
+        return None
+    protected = []
+    if SETTLEMENT_PATH.is_file():
+        configuration = json.loads(SETTLEMENT_PATH.read_text(encoding="utf-8"))
+        protected = configuration.get("protected_regions", [])
+    controller = KeeperController(
+        KEEPER_DEFINITIONS_PATH, os.getenv("KEEPER_WORLD_ID", ""),
+        os.getenv("KEEPER_TEMPLE_RESOURCE", ""),
+        tuple(optional_coordinate(f"KEEPER_TEMPLE_MIN_{axis}") for axis in "XYZ"),
+        os.getenv("KEEPER_TEMPLE_FACING", ""), OFFERING_CHEST, rcon,
+        lambda: save_state(state), dry_run=DRY_RUN or not persist, protected_regions=protected)
+    if not persist:
+        return controller
+    if DRY_RUN:
+        # The Director owns this temporary loaded State; only its in-memory
+        # enrollment is needed to inspect/bind quests without a durable write.
+        controller._enroll(state.keepers, save=False)
     else:
+        controller.enroll(state.keepers)
+    changed = False
+    for quest in active_quests(state):
+        previous = (quest.keeper_id, quest.source)
+        bind_quest(state, quest)
+        changed |= previous != (quest.keeper_id, quest.source)
+    for pending in state.pending_settlement_rewards:
+        if not pending.source:
+            raise KeeperError(f"Quest {pending.quest.quest_id}: legacy offering source is ambiguous; reconcile offline")
+        if pending.source != {"dimension": controller.binding["dimension"],
+                              "position": controller.binding["chest"]}:
+            raise KeeperError("pending operation belongs to a different original chest")
+        if pending.keeper_id is None:
+            pending.quest.source = dict(pending.source)
+            bind_quest(state, pending.quest)
+            pending.keeper_id = pending.quest.keeper_id
+            changed = True
+        validate_pending_reward(pending, state)
+    if changed and persist and not DRY_RUN:
+        save_state(state)
+    return controller
+
+
+def ensure_writer_safe(state: State) -> None:
+    for pending in state.pending_settlement_rewards:
+        if pending.consumption == "uncertain" or pending.consumption_uncertain or pending.vanilla_uncertain:
+            raise KeeperUncertain(f"Quest {pending.quest.quest_id} requires offline reconciliation: {pending.last_error}")
+    for key, record in state.keepers.items():
+        upgrade = record["evolution"]["upgrade"]
+        if upgrade and upgrade["uncertain"]:
+            raise KeeperUncertain(f"Keeper {key} has an interrupted decorative mutation; reconcile offline")
+
+
+def source_slots(quest: Quest) -> list[dict]:
+    if quest.submission != "offering_chest":
         raise ValueError("shared offering chest is the only supported quest source")
+    source = quest_source(quest)
+    x, y, z = source["position"]
+    prefix = f"execute in {source['dimension']} if loaded {x} {y} {z}"
+    if rcon(f"{prefix} if block {x} {y} {z} minecraft:chest").strip() != "Test passed":
+        raise ValueError("bound offering source is not a loaded normal chest")
+    response = rcon(f"{prefix} run data get block {x} {y} {z} Items")
+    if response == "Found no elements matching Items":
+        return []
+    if "[" not in response or "Test failed" in response:
+        raise RconError("offering inventory response was not affirmative")
     return parse_inventory_slots(response)
 
 
@@ -660,13 +805,9 @@ def items_in_source(quest: Quest, slots: list[dict] | None = None) -> int:
     return sum(slot["count"] for slot in slots if slot["id"] == quest.item)
 
 
-def source_descriptor(quest: Quest) -> tuple[str, str] | None:
-    if quest.submission == "offering_chest":
-        if any(value is None for value in OFFERING_CHEST):
-            return None
-        x, y, z = OFFERING_CHEST
-        return f"block {x} {y} {z}", "Items"
-    return None
+def source_descriptor(quest: Quest) -> tuple[str, str]:
+    x, y, z = quest_source(quest)["position"]
+    return f"block {x} {y} {z}", "Items"
 
 
 def source_fingerprint(slots: list[dict]) -> list[dict]:
@@ -674,10 +815,11 @@ def source_fingerprint(slots: list[dict]) -> list[dict]:
 
 
 def offering_source_commands(quest: Quest, slots: list[dict]) -> list[str]:
-    descriptor = source_descriptor(quest)
-    if descriptor is None:
-        raise ValueError("quest offering source is not configured")
-    target, path = descriptor
+    target, path = source_descriptor(quest)
+    source = quest_source(quest)
+    x, y, z = source["position"]
+    prefix = (f"execute in {source['dimension']} if loaded {x} {y} {z} "
+              f"if block {x} {y} {z} minecraft:chest run ")
     remaining = quest.quantity
     commands = []
     for slot in slots:
@@ -685,10 +827,10 @@ def offering_source_commands(quest: Quest, slots: list[dict]) -> list[str]:
             continue
         take = min(remaining, slot["count"])
         if take == slot["count"]:
-            commands.append(f"data remove {target} {path}[{{Slot:{slot['slot']}b}}]")
+            commands.append(f"{prefix}data remove {target} {path}[{{Slot:{slot['slot']}b}}]")
         else:
             new_count = slot["count"] - take
-            commands.append(f"data modify {target} {path}[{{Slot:{slot['slot']}b}}].count set value {new_count}")
+            commands.append(f"{prefix}data modify {target} {path}[{{Slot:{slot['slot']}b}}].count set value {new_count}")
         remaining -= take
     if remaining:
         raise ValueError("offering quantity is no longer available")
@@ -790,6 +932,9 @@ def completion_allowed(state: State, quest: Quest) -> bool:
 
 
 def complete_quest(state: State, quest: Quest, manager=None) -> list[dict]:
+    bind_quest(state, quest)
+    if quest.keeper_id is not None and quest.quest_id in state.keepers[quest.keeper_id]["progression"]["credited_quest_ids"]:
+        return []
     if any(entry.quest.quest_id == quest.quest_id for entry in state.pending_settlement_rewards):
         return complete_settlement_quest(state, quest, manager)
     if not completion_allowed(state, quest):
@@ -809,22 +954,168 @@ def complete_quest(state: State, quest: Quest, manager=None) -> list[dict]:
     return complete_settlement_quest(state, quest, manager, slots)
 
 
-def vanilla_commands(pending: PendingReward) -> list[str]:
+def reward_plan(pending: PendingReward) -> list[dict]:
     quest = pending.quest
-    reward_cmd, reward_name = REWARDS[quest.reward_tier][pending.vanilla_choice]
-    recipients = pending.recipients or ([quest.player] if quest.lane == "private" else [])
-    commands = []
-    for player in recipients:
-        commands.extend([
-            reward_cmd.format(player=player),
-            f"experience add {player} {quest.reward_tier * 2} levels",
-            f"title {player} title " + json.dumps(
-                {"text": "QUEST COMPLETE", "color": "green", "bold": True}, separators=(",", ":")),
-            f"playsound minecraft:ui.toast.challenge_complete master {player}",
+    command, reward_name = REWARDS[quest.reward_tier][pending.vanilla_choice]
+    _, _, item, amount = command.split()
+    actions = []
+    benefits = keeper_policy(pending.reward_rank)
+    for player in pending.recipients:
+        actions.extend([
+            {"kind": "item", "player": player, "item": item, "amount": int(amount)},
+            {"kind": "experience", "player": player, "amount": quest.reward_tier * 2, "unit": "levels"},
         ])
-    names = ", ".join(recipients)
-    commands.append(f"tellraw @a {json_text('[The Keeper] ' + names + ' completed ' + repr(quest.title) + ' and received ' + reward_name + '!')}")
-    return commands
+        if benefits["bonus_points"]:
+            actions.append({"kind": "experience", "player": player,
+                            "amount": benefits["bonus_points"], "unit": "points"})
+        for effect, seconds in (("haste", benefits["haste_seconds"]),
+                                ("resistance", benefits["resistance_seconds"])):
+            if seconds:
+                actions.append({"kind": "effect", "player": player,
+                                "effect": effect, "seconds": seconds, "amplifier": 0})
+        actions.extend([{"kind": "title", "player": player}, {"kind": "sound", "player": player}])
+    text = ("[The Keeper] " + ", ".join(pending.recipients) + " completed "
+            + repr(quest.title) + " and received " + reward_name + "!")
+    actions.append({"kind": "announcement", "text": text})
+    return actions
+
+
+def legacy_pending_source(pending: PendingReward) -> dict:
+    if pending.source:
+        return pending.source
+    if pending.quest.source:
+        return pending.quest.source
+    commands = pending.consumption_commands or pending.source_snapshot.get("commands", [])
+    positions = set()
+    for command in commands:
+        match = re.search(r"data (?:remove|modify) block (-?\d+) (-?\d+) (-?\d+) Items", command)
+        if match is None or ("execute in " in command and "execute in minecraft:overworld " not in command):
+            return {}
+        positions.add(tuple(int(value) for value in match.groups()))
+    if len(positions) == 1:
+        return {"dimension": "minecraft:overworld", "position": list(positions.pop())}
+    if not commands and pending.consumption == "prepared" and not pending.consumption_uncertain:
+        try:
+            return configured_source()
+        except ValueError:
+            return {}
+    return {}
+
+
+def freeze_pending_reward(pending: PendingReward, state: State, *, legacy: bool = False) -> None:
+    if pending.reward_plan is not None:
+        return
+    if not pending.recipients and pending.quest.lane == "private":
+        pending.recipients = [pending.quest.player]
+    if legacy:
+        source = legacy_pending_source(pending)
+        pending.source = ({"dimension": source["dimension"], "position": list(source["position"])}
+                          if source else {})
+        pending.reward_rank = 1
+        pending.keeper_id = pending.quest.keeper_id
+    else:
+        bind_quest(state, pending.quest)
+        pending.source = {"dimension": pending.quest.source["dimension"],
+                          "position": list(pending.quest.source["position"])}
+        pending.keeper_id = pending.quest.keeper_id
+        pending.reward_rank = (keeper_rank(state.keepers[pending.keeper_id])
+                               if KEEPER_ENABLED and pending.keeper_id is not None else 1)
+    pending.reward_plan = reward_plan(pending)
+
+
+def validate_pending_reward(pending: PendingReward, state: State) -> None:
+    validate_source(pending.source)
+    if (not isinstance(pending.recipients, list) or not pending.recipients
+            or any(not isinstance(player, str) or not PLAYER_RE.fullmatch(player)
+                   or player in {COMMUNAL_PLAYER, PRIVATE_PLAYER} for player in pending.recipients)
+            or len(set(pending.recipients)) != len(pending.recipients)):
+        raise ValueError("invalid frozen reward recipients")
+    if pending.quest.lane == "private" and pending.recipients != [pending.quest.player]:
+        raise ValueError("private reward recipients do not match its target")
+    if pending.keeper_id != pending.quest.keeper_id:
+        raise ValueError("pending Keeper identity differs from its quest")
+    if pending.keeper_id is not None:
+        record = state.keepers.get(pending.keeper_id)
+        if record is None or pending.source != {
+            "dimension": record["binding"]["dimension"], "position": record["binding"]["chest"]
+        }:
+            raise ValueError("pending Keeper/source binding is inconsistent")
+    if pending.quest.source and pending.source != pending.quest.source:
+        raise ValueError("pending source differs from its quest")
+    if type(pending.reward_rank) is not int or not 1 <= pending.reward_rank <= 5:
+        raise ValueError("invalid frozen Keeper reward rank")
+    expected_plan = reward_plan(pending)
+    if not isinstance(pending.reward_plan, list) or len(pending.reward_plan) != len(expected_plan):
+        raise ValueError("frozen reward plan is outside the trusted policy")
+    for action, expected in zip(pending.reward_plan, expected_plan):
+        if (not isinstance(action, dict) or set(action) != set(expected)
+                or any(type(action[key]) is not type(value) or action[key] != value
+                       for key, value in expected.items())):
+            raise ValueError("frozen reward action is outside the trusted policy")
+    if pending.keeper_id is None and pending.reward_rank != 1:
+        raise ValueError("ranked reward has no issuing Keeper")
+    if pending.keeper_id is not None and pending.reward_rank > keeper_rank(record):
+        raise ValueError("prepared reward rank exceeds the issuer's earned rank")
+    if pending.consumption == "prepared":
+        validate_source(pending.source, allow_empty=False)
+        x, y, z = pending.source["position"]
+        prefix = (f"execute in {pending.source['dimension']} if loaded {x} {y} {z} "
+                  f"if block {x} {y} {z} minecraft:chest run ")
+        target = re.escape(f"block {x} {y} {z}")
+        expression = (rf"data (?:remove {target} Items\[\{{Slot:(?:[0-9]|1[0-9]|2[0-6])b\}}\]"
+                      rf"|modify {target} Items\[\{{Slot:(?:[0-9]|1[0-9]|2[0-6])b\}}\]\.count set value [1-9][0-9]*)")
+        commands = pending.consumption_commands or pending.source_snapshot.get("commands", [])
+        for command in commands:
+            body = command[len(prefix):] if command.startswith(prefix) else command
+            if re.fullmatch(expression, body) is None:
+                raise ValueError("prepared consumption command conflicts with its immutable source")
+    if type(pending.vanilla_step) is not int or not 0 <= pending.vanilla_step <= len(pending.reward_plan):
+        raise ValueError("reward progress exceeds its frozen plan")
+    if pending.keeper_id is not None and pending.quest.quest_id in record["progression"]["credited_quest_ids"]:
+        raise ValueError("completed Keeper quest still has pending reward debt")
+
+
+def execute_reward_action(action: dict) -> None:
+    kind = action["kind"]
+    player = action.get("player")
+    if kind == "item":
+        response = rcon(f"give {player} {action['item']} {action['amount']}")
+        names = {"minecraft:emerald": "Emerald", "minecraft:gold_ingot": "Gold Ingot",
+                 "minecraft:diamond": "Diamond", "minecraft:ancient_debris": "Ancient Debris"}
+        expected = f"Gave {action['amount']} [{names[action['item']]}] to {player}"
+    elif kind == "experience":
+        response = rcon(f"experience add {player} {action['amount']} {action['unit']}")
+        expected = f"Gave {action['amount']} experience {action['unit']} to {player}"
+    elif kind == "effect":
+        effect = action["effect"]
+        response = rcon(f"effect give {player} minecraft:{effect} {action['seconds']} {action['amplifier']} true")
+        expected = f"Applied effect {effect.title()} to {player}"
+        if response == "Unable to apply this effect (target is either immune to effects, or has something stronger)":
+            path = f'active_effects[{{id:"minecraft:{effect}"}}]'
+            duration = rcon(f"data get entity {player} {path}.duration")
+            match = re.fullmatch(re.escape(player) + r" has the following entity data: (-?\d+)", duration)
+            if match and (int(match.group(1)) == -1 or int(match.group(1)) > 0):
+                amplifier = rcon(f"data get entity {player} {path}.amplifier")
+                value = re.fullmatch(re.escape(player) + r" has the following entity data: (\d+)b?", amplifier)
+                if (value and int(value.group(1)) >= action["amplifier"]
+                        or action["amplifier"] == 0
+                        and amplifier == f"Found no elements matching {path}.amplifier"):
+                    return
+            raise RconError("existing blessing effect could not be verified")
+    elif kind == "title":
+        rcon(f"title {player} title " + json.dumps(
+            {"text": "QUEST COMPLETE", "color": "green", "bold": True}, separators=(",", ":")))
+        return
+    elif kind == "sound":
+        rcon(f"playsound minecraft:ui.toast.challenge_complete master {player}")
+        return
+    elif kind == "announcement":
+        rcon(f"tellraw @a {json_text(action['text'])}")
+        return
+    else:
+        raise ValueError("unvalidated reward action")
+    if response.strip() != expected:
+        raise RconError(f"Reward acknowledgement did not match the requested action: {response!r}")
 
 
 def complete_settlement_quest(state: State, quest: Quest, manager, slots: list[dict] | None = None) -> list[dict]:
@@ -834,6 +1125,9 @@ def complete_settlement_quest(state: State, quest: Quest, manager, slots: list[d
                     if entry.quest.quest_id == quest.quest_id), None)
     if pending is None:
         if not completion_allowed(state, quest):
+            return []
+        bind_quest(state, quest)
+        if quest.keeper_id is not None and quest.quest_id in state.keepers[quest.keeper_id]["progression"]["credited_quest_ids"]:
             return []
         slots = source_slots(quest) if slots is None else slots
         commands = offering_source_commands(quest, slots)
@@ -846,8 +1140,14 @@ def complete_settlement_quest(state: State, quest: Quest, manager, slots: list[d
             recipients=recipients,
             source_snapshot={"slots": source_fingerprint(slots), "commands": commands},
         )
+        freeze_pending_reward(pending, state)
+        validate_pending_reward(pending, state)
         state.pending_settlement_rewards.append(pending)
         save_state(state)
+    if pending.reward_plan is None:
+        freeze_pending_reward(pending, state, legacy=True)
+        save_state(state)
+    validate_pending_reward(pending, state)
     if pending.consumption == "done":
         return process_pending_rewards(state, manager)
     if pending.consumption == "uncertain":
@@ -871,10 +1171,15 @@ def complete_settlement_quest(state: State, quest: Quest, manager, slots: list[d
         while pending.consumption_step < len(pending.consumption_commands):
             pending.consumption_uncertain = True
             save_state(state)
-            rcon(pending.consumption_commands[pending.consumption_step])
+            response = rcon(pending.consumption_commands[pending.consumption_step])
+            x, y, z = pending.source["position"]
+            if response.strip() != f"Modified block data of {x}, {y}, {z}":
+                raise RconError(f"Offering mutation was not acknowledged: {response!r}")
             pending.consumption_uncertain = False
             pending.consumption_step += 1
             save_state(state)
+    except KeeperUncertain:
+        raise
     except Exception as exc:
         pending.last_error = f"Offering consumption requires reconciliation: {exc}"
         save_state(state)
@@ -893,22 +1198,33 @@ def process_pending_rewards(state: State, manager) -> list[dict]:
         if pending.consumption != "done" or pending.consumption_uncertain:
             continue
         quest = pending.quest
-        if not pending.vanilla_uncertain:
-            commands = vanilla_commands(pending)
-            while pending.vanilla_step < len(commands):
-                command = commands[pending.vanilla_step]
-                pending.vanilla_step += 1
-                pending.vanilla_uncertain = True
+        if pending.reward_plan is None:
+            freeze_pending_reward(pending, state, legacy=True)
+            save_state(state)
+        validate_pending_reward(pending, state)
+        if not pending.source:
+            raise KeeperError("legacy pending reward source is ambiguous; reconcile offline before dispatch")
+        if pending.vanilla_uncertain:
+            return events
+        if KEEPER_ENABLED and pending.keeper_id is None:
+            raise KeeperError("legacy pending reward requires verified original Keeper mapping")
+        while pending.vanilla_step < len(pending.reward_plan):
+            action = pending.reward_plan[pending.vanilla_step]
+            # Preserve legacy dispatch-index semantics across migration.
+            pending.vanilla_step += 1
+            pending.vanilla_uncertain = True
+            save_state(state)
+            try:
+                execute_reward_action(action)
+            except KeeperUncertain:
+                raise
+            except Exception as exc:
+                pending.last_error = f"Player reward requires reconciliation: {exc}"
                 save_state(state)
-                try:
-                    rcon(command)
-                except Exception as exc:
-                    pending.last_error = f"Vanilla reward requires reconciliation: {exc}"
-                    save_state(state)
-                    print(f"[WARN] Quest {quest.quest_id}: {pending.last_error}")
-                    break
-                pending.vanilla_uncertain = False
-                save_state(state)
+                print(f"[WARN] Quest {quest.quest_id}: {pending.last_error}")
+                return events
+            pending.vanilla_uncertain = False
+            save_state(state)
         try:
             owner = (pending.recipients or [quest.player])[0]
             if manager is not None and not pending.recorded:
@@ -937,13 +1253,20 @@ def process_pending_rewards(state: State, manager) -> list[dict]:
                 pending.structures_done += 1
                 save_state(state)
             vanilla_done = (not pending.vanilla_uncertain
-                            and pending.vanilla_step == len(vanilla_commands(pending)))
+                            and pending.vanilla_step == len(pending.reward_plan))
             xp_required = any(reward["type"] == "settlement_xp" and reward["amount"]
                               for reward in quest.rewards)
             obligations_done = (pending.structures_done == len(structures)
                                 and (not xp_required or pending.xp_done)
                                 and (manager is None or pending.recorded))
             if vanilla_done and obligations_done:
+                old_rank = 1
+                record = None
+                if KEEPER_ENABLED and pending.keeper_id is not None:
+                    record = state.keepers[pending.keeper_id]
+                    old_rank = keeper_rank(record)
+                    if not keeper_credit(record, quest.quest_id):
+                        raise KeeperError("Keeper completion identity was already credited")
                 # Successful completion makes only this lane immediately due.
                 if quest.lane == "communal":
                     state.communal_completions = min(3, state.communal_completions + 1)
@@ -955,6 +1278,11 @@ def process_pending_rewards(state: State, manager) -> list[dict]:
                 _clear_quest_lane(state, quest)
                 state.pending_settlement_rewards.remove(pending)
                 save_state(state)
+                if record is not None and keeper_rank(record) > old_rank:
+                    events.append({"type": "keeper_level_up", "keeper_id": pending.keeper_id,
+                                   "new_rank": keeper_rank(record)})
+        except KeeperUncertain:
+            raise
         except Exception as exc:
             error = str(exc)[:500]
             if pending.last_error != error:
@@ -1147,6 +1475,7 @@ def assign_quest(state: State, quest: Quest, candidates: list[dict]) -> bool:
     if DRY_RUN:
         print(f"[DRY_RUN] Would announce: {quest.announcement}")
         return False
+    bind_quest(state, quest)
     now = time.time()
     if quest.lane == "communal":
         state.communal_quest = quest
@@ -1318,6 +1647,23 @@ def interesting(line: str) -> bool:
     return any(pattern in line for pattern in INTERESTING_PATTERNS)
 
 
+def announce_keeper_rank(state: State, selected_id: str | None) -> None:
+    if not KEEPER_ENABLED or DRY_RUN or selected_id is None:
+        return
+    record = state.keepers[selected_id]
+    current = keeper_rank(record)
+    if current <= record["progression"]["last_announced_rank"]:
+        return
+    record["progression"]["last_announced_rank"] = current
+    save_state(state)
+    x, y, z = record["binding"]["chest"]
+    try:
+        announce(f"Keeper at {x}, {y}, {z} advanced to {keeper_policy(current)['name']} "
+                 f"(rank {current}). Subsequent offerings unlock its new blessings and bonus XP.")
+    except (OSError, RconError) as exc:
+        print(f"[WARN] Keeper rank notice interrupted; saved progress is authoritative: {exc}")
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     print("Minecraft AI Director starting")
@@ -1332,18 +1678,24 @@ def main() -> int:
 
     try:
         state = load_state()
-    except ValueError as exc:
+    except (ValueError, KeeperUncertain) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     recent_events: deque[str] = deque(maxlen=40)
     tail = LogTail(LOG_PATH)
     manager = None
+    keeper = None
     decision_events: deque[dict] = deque(maxlen=12)
     last_decision_at = time.time()
 
     try:
         # Fail fast if RCON details are wrong.
         print(f"Online players: {online_players()}")
+        if not DRY_RUN:
+            ensure_writer_safe(state)
+        keeper = keeper_controller(state, persist=True)
+        if keeper is not None:
+            print(f"[KEEPER] Registered {keeper.keeper_id}")
         if SETTLEMENT_ENABLED:
             from settlement import StructureManager
             manager = StructureManager(
@@ -1368,12 +1720,18 @@ def main() -> int:
                     print(f"[EVENT] {line}")
 
             try:
+                if not DRY_RUN:
+                    ensure_writer_safe(state)
+                if keeper is not None:
+                    keeper.verify_source(state.keepers)
                 if manager is not None:
                     for event in manager.tick():
                         print(f"[SETTLEMENT] {json.dumps(event)}")
                         if event["type"] in ("settlement_level_up", "construction_complete"):
                             decision_events.append(event)
                 decision_events.extend(process_pending_rewards(state, manager))
+                if not DRY_RUN:
+                    ensure_writer_safe(state)
                 players = online_players()
                 pending_ids = {entry.quest.quest_id for entry in state.pending_settlement_rewards}
                 suspended = set()
@@ -1383,7 +1741,13 @@ def main() -> int:
                 for quest in active_quests(state):
                     if quest.quest_id not in suspended and (quest.lane == "communal" or quest.player in players):
                         decision_events.extend(complete_quest(state, quest, manager))
+                        if not DRY_RUN:
+                            ensure_writer_safe(state)
                 schedule_quests(state, players, list(recent_events), manager)
+                if keeper is not None:
+                    announce_keeper_rank(state, keeper.keeper_id)
+                    for event in keeper.tick(state.keepers):
+                        print(f"[KEEPER] {json.dumps(event)}")
 
                 if (manager is not None and players and decision_events and not DEMO_MODE
                         and LLM_URL and LLM_MODEL
@@ -1397,6 +1761,11 @@ def main() -> int:
                     except Exception as exc:
                         print(f"[WARN] Settlement AI decision rejected/failed: {exc}")
 
+            except KeeperUncertain as exc:
+                print(f"ERROR: Director writer stopped for reconciliation: {exc}", file=sys.stderr)
+                return 2
+            except KeeperError as exc:
+                print(f"[WARN] Keeper source suspended: {exc}")
             except (OSError, RconError) as exc:
                 print(f"[WARN] RCON problem: {exc}")
             except Exception as exc:

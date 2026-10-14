@@ -105,6 +105,9 @@ Each of the 32 root definitions records template size/floor, chest/entry, requir
 
 Also record invariant identification cells separately from rank-mutable decoration. These allow later provenance-backed discovery to recognize every authorized installed rank and a recorded acknowledged partial upgrade without requiring baseline idol/lighting blocks. They do not authorize repair, arbitrary lookalikes, or bypass uncertain dispatch.
 
+Native street/terrain assembly owns the outer connector and two inward columns. A fresh, player-free Java 26.3 world with the live seed reproduced dirt paths, grass, and short grass instead of raw-template states there. Derive the entire supported route from real NBT, but declare exact runtime access probes only on its internal plaza segment, starting three columns inward. Keep invariant cells, stairs, internal support/headroom, chest/lid, and every mutable baseline/transition exact. Do not learn arbitrary live states, replace roads, broaden mutation targets, or modify generation assets to enroll. This is a generation-aware source-boundary correction, not a repair fallback; definition digests still forbid changing enrolled/upgrading assets in place.
+
+
 Author cumulative visual stages:
 
 - Awakened: additional supported warm lighting beside the altar and entrance, not a chest-lid obstruction or removal of current lanterns.

@@ -14,6 +14,11 @@ full configuration and admin contract before changing behavior.
 - `quest_supply.py`: standard-library Anvil supply observation, Java 26.3
   inventory parsing, bounded player strength profiles, and fail-closed candidate
   context. It never emits commands or accepts model-authored IDs/scores.
+- `keeper.py`: independent temple rank policy, strict Keeper records, exact
+  source binding, guarded cumulative decorations, and uncertain-operation stops.
+- `keeper_admin.py`: read-only JSON `show`/`preview`; no writer, discovery, or LLM.
+- `config/keeper_temples.json`: authored per-root invariant/internal-access probes
+  and exact decoration transitions; `tools/keeper_patches.py` authors/checks them.
 - `settlement.py`: `StructureManager`; trusted registry/config validation,
   plot inspection, placement/upgrades/removal, staged jobs, SQLite persistence,
   XP/unlocks, initialization, and constrained model actions.
@@ -30,6 +35,12 @@ full configuration and admin contract before changing behavior.
 No third-party Python packages or build step are required. Settlements are off
 by default; enabling them requires both `DIRECTOR_SETTLEMENT_ENABLED=1` and
 `settlement.enabled=true` in the selected configuration.
+
+Keeper levels are separately opt-in (`DIRECTOR_KEEPER_ENABLED=1`). Preserve
+quest JSON schema 2 and `keepers` bindings/credit ledgers/evolution together
+with immutable pending issuer/source/recipient/rank/action plans and dispatch
+indices/uncertainty. Do not backfill Keeper XP from lane or settlement history.
+Changing an enrolled definition digest is not an upgrade or recovery mechanism.
 
 ## Non-negotiable safety and persistence invariants
 
@@ -155,6 +166,18 @@ coordinates, not defaults for another world. Inspect current state before use.
 - Current policy is survival/normal, online authentication, and settlements
   disabled. Preserve actual access policy and the existing LLM configuration;
   do not copy the isolated server's creative/DEMO settings into production.
+- The verified levels binding for this unchanged landmark is
+  `minecraft:village/plains/town_centers/plains_fountain_01`, minimum corner
+  `64, 86, 288`, facing `north`, chest `76, 90, 304`. Persist one stable
+  `KEEPER_WORLD_ID` in the Keeper Quadlet and retain it with the paired state.
+  Enabling levels starts a new empty Keeper ledger without resetting existing
+  private/communal counters. Do not copy a disposable fixture's identity.
+- Native street assembly owns the connector plus its two inward columns.
+  Exact access probes begin on the supported internal plaza route; do not
+  replace generation-owned paths/grass/plants to satisfy raw-template states.
+  Stairs/interior support/headroom, chest/lid, invariants, and all decoration
+  mutations remain exact. This boundary was proven with untouched same-seed
+  Java 26.3 generation, not inferred from a modified live world.
 
 The pre-landmark rollback generation, paired archives, checksums, private
 configuration, and deployment evidence are under
