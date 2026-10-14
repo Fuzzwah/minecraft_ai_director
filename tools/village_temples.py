@@ -234,16 +234,8 @@ def validate_root(root, record, *, rotations=range(4)):
             **{name: len(cells) for name, cells in record["features"].items()}}
 
 
-def validate_processors(root, record, processors, tags):
-    """Prove all random rule outcomes preserve authored critical cells.
-
-    This does not substitute for actual terrain/downstream-piece generation.
-    """
-    floor = record["floor_y"]
-    ax, ay, az = record["altar"]["base"]
-    critical_positions = {tuple(cell["pos"]) for cells in record["features"].values() for cell in cells}
-    critical_positions |= {(ax, ay, az), (ax, ay + 1, az)}
-
+def processor_outcomes(original, processors, tags):
+    """Return every possible rule-processor outcome for one complete state."""
     def state(value):
         return {"id": value} if isinstance(value, str) else value
 
@@ -257,27 +249,37 @@ def validate_processors(root, record, processors, tags):
             return original["id"] in tags[predicate["tag"]]
         raise ValueError(f"Unsupported consumed processor predicate {kind}")
 
-    def outcomes(original):
-        possible = [original]
-        for processor in processors["processors"]:
-            if processor["processor_type"] != "minecraft:rule":
-                raise ValueError("Unsupported consumed processor type")
-            next_states = []
-            for old in possible:
-                for rule in processor["rules"]:
-                    if rule["location_predicate"]["predicate_type"] != "minecraft:always_true":
-                        raise ValueError("Unsupported consumed location predicate")
-                    predicate = rule["input_predicate"]
-                    if matches(predicate, old):
-                        next_states.append(state(rule["output_state"]))
-                        if predicate["predicate_type"] != "minecraft:random_block_match":
-                            break
-                else:
-                    next_states.append(old)
-            possible = next_states
-        return possible
+    possible = [original]
+    for processor in processors["processors"]:
+        if processor["processor_type"] != "minecraft:rule":
+            raise ValueError("Unsupported consumed processor type")
+        next_states = []
+        for old in possible:
+            for rule in processor["rules"]:
+                if rule["location_predicate"]["predicate_type"] != "minecraft:always_true":
+                    raise ValueError("Unsupported consumed location predicate")
+                predicate = rule["input_predicate"]
+                if matches(predicate, old):
+                    next_states.append(state(rule["output_state"]))
+                    if predicate["predicate_type"] != "minecraft:random_block_match":
+                        break
+            else:
+                next_states.append(old)
+        possible = next_states
+    return possible
 
-    palette_outcomes = [outcomes(state) for state in root["palette"]]
+
+def validate_processors(root, record, processors, tags):
+    """Prove all random rule outcomes preserve authored critical cells.
+
+    This does not substitute for actual terrain/downstream-piece generation.
+    """
+    floor = record["floor_y"]
+    ax, ay, az = record["altar"]["base"]
+    critical_positions = {tuple(cell["pos"]) for cells in record["features"].values() for cell in cells}
+    critical_positions |= {(ax, ay, az), (ax, ay + 1, az)}
+
+    palette_outcomes = [processor_outcomes(state, processors, tags) for state in root["palette"]]
     for block in root["blocks"]:
         x, y, z = block["pos"]
         original = root["palette"][block["state"]]
@@ -603,14 +605,27 @@ def generate(archive, output=DEFAULT_OUTPUT):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--archive", type=Path, help="Exact pinned vanilla Java 26.3 server archive")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--archive", type=Path, help="Exact pinned vanilla Java 26.3 server archive")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--check", action="store_true", help="Inspect committed pack without the source archive")
+    mode.add_argument("--check", action="store_true", help="Inspect committed pack without the source archive")
+    mode.add_argument("--write-keeper-patches", action="store_true",
+                      help="Explicitly author the separate Keeper milestone manifest; never rewrite generation assets")
+    mode.add_argument("--check-keeper-patches", action="store_true",
+                      help="Read-only validation of Keeper milestones against the real committed roots")
+    parser.add_argument("--keeper-definitions", type=Path, default=BASE / "config/keeper_temples.json",
+                        help="Keeper manifest output/check path")
     args = parser.parse_args(argv)
-    if args.check == bool(args.archive):
-        parser.error("choose exactly one of --archive or --check")
     try:
-        result = validate_pack(args.output) if args.check else generate(args.archive, args.output)
+        if args.write_keeper_patches or args.check_keeper_patches:
+            if __package__:
+                from . import keeper_patches
+            else:
+                import keeper_patches
+            operation = keeper_patches.write_patches if args.write_keeper_patches else keeper_patches.check_patches
+            result = operation(args.keeper_definitions, args.output)
+        else:
+            result = validate_pack(args.output) if args.check else generate(args.archive, args.output)
     except (ValueError, KeyError, OSError, zipfile.BadZipFile) as exc:
         parser.exit(1, f"Temple assets rejected: {exc}\n")
     print(json.dumps(result, sort_keys=True))

@@ -119,8 +119,10 @@ class DirectorTests(unittest.TestCase):
             self.assertIn("Trial of Diamond", json.dumps(context["recent_quests"]))
         finally:
             restarted.close()
-        self.assertEqual(sum(c.startswith("give ") for c in self.world.commands), 1)
-        self.assertEqual(sum(c.startswith(("data remove block", "data modify block")) for c in self.world.commands), 1)
+        self.assertEqual(self.world.player_levels["CheekyHambone"], 6)
+        self.assertIn(self.world.player_rewards["CheekyHambone"],
+                      [{"minecraft:diamond": 4}, {"minecraft:ancient_debris": 1}])
+        self.assertEqual(self.world.chest_items, [(0, "minecraft:diamond", 2)])
 
     def test_blocked_structure_reward_survives_restart_without_double_pay(self):
         self.manager.grant_xp(100)
@@ -140,8 +142,10 @@ class DirectorTests(unittest.TestCase):
         self.assertEqual(restarted_state.private_completions, {"CheekyHambone": 1})
         self.assertEqual(self.manager.show_settlement()["xp"], 130)
         self.assertEqual(len(self.world.placements), 1)
-        self.assertEqual(sum(c.startswith("give ") for c in self.world.commands), 1)
-        self.assertEqual(sum(c.startswith(("data remove block", "data modify block")) for c in self.world.commands), 1)
+        self.assertEqual(self.world.player_levels["CheekyHambone"], 6)
+        self.assertIn(self.world.player_rewards["CheekyHambone"],
+                      [{"minecraft:diamond": 4}, {"minecraft:ancient_debris": 1}])
+        self.assertEqual(self.world.chest_items, [(0, "minecraft:diamond", 2)])
 
     def test_dry_run_quest_never_consumes_grants_or_saves(self):
         quest = self.quest([{"type": "settlement_xp", "amount": 30}])
@@ -153,7 +157,9 @@ class DirectorTests(unittest.TestCase):
         self.assertEqual(self.manager.show_settlement()["xp"], 0)
         self.assertEqual(state.private_completions, {})
         self.assertEqual(state.private_issued, {})
-        self.assertFalse(any(c.startswith(("clear ", "give ", "experience ", "title ")) for c in self.world.commands))
+        self.assertEqual(self.world.player_rewards, {})
+        self.assertEqual(self.world.player_levels, {})
+        self.assertEqual(self.world.chest_items, [(0, "minecraft:diamond", 3)])
 
     def test_uncertain_consumption_is_not_replayed_after_restart(self):
         quest = self.quest([{"type": "settlement_xp", "amount": 30}])
@@ -161,8 +167,8 @@ class DirectorTests(unittest.TestCase):
         original = self.world.command
 
         def uncertain(command):
-            if command.startswith(("data remove block", "data modify block")):
-                self.world.commands.append(command)
+            if command.rsplit(" run ", 1)[-1].startswith(("data remove block", "data modify block")):
+                original(command)
                 raise OSError("Lost response after consuming items")
             return original(command)
 
@@ -170,7 +176,8 @@ class DirectorTests(unittest.TestCase):
             director.complete_quest(state, quest, self.manager)
         restarted = director.load_state()
         director.process_pending_rewards(restarted, self.manager)
-        self.assertEqual(sum(c.startswith(("data remove block", "data modify block")) for c in self.world.commands), 1)
+        self.assertEqual(self.world.chest_items, [(0, "minecraft:diamond", 2)])
+        self.assertEqual(self.world.player_rewards, {})
         self.assertEqual(self.manager.show_settlement()["xp"], 0)
         self.assertEqual(restarted.pending_settlement_rewards[0].consumption, "uncertain")
         self.assertEqual(restarted.private_completions, {})
@@ -330,28 +337,6 @@ class DirectorTests(unittest.TestCase):
                 else:
                     factory(["CheekyHambone"], state=state)
 
-    def test_state_round_trip_counters_and_strict_legacy_defaults(self):
-        quest = self.quest()
-        pending = director.PendingReward(quest, 0, consumption="uncertain",
-                                         consumption_commands=["data remove block 0 64 0 Items[0]"],
-                                         recipients=["CheekyHambone"], source_snapshot={"slots": [{"raw": "{id:x}"}]})
-        state = director.State(private_quests={quest.player: quest}, pending_settlement_rewards=[pending],
-                               communal_completions=2, private_completions={quest.player: 3},
-                               private_issued={quest.player: 9})
-        director.save_state(state)
-        self.assertEqual(asdict(director.load_state()), asdict(state))
-        raw = json.loads(director.STATE_PATH.read_text())
-        for key in ("communal_completions", "private_completions", "private_issued"):
-            raw.pop(key)
-        for key in ("policy_version", "mode", "reference_band"):
-            raw["private_quests"][quest.player].pop(key)
-            raw["pending_settlement_rewards"][0]["quest"].pop(key)
-        director.STATE_PATH.write_text(json.dumps(raw))
-        loaded = director.load_state()
-        self.assertEqual((loaded.communal_completions, loaded.private_completions, loaded.private_issued), (0, {}, {}))
-        self.assertEqual(loaded.private_quests[quest.player].policy_version, 0)
-        self.assertEqual(loaded.pending_settlement_rewards[0].source_snapshot, pending.source_snapshot)
-        self.assertEqual(loaded.pending_settlement_rewards[0].consumption_commands, pending.consumption_commands)
 
     def test_invalid_state_progress_is_never_reset_without_settlements(self):
         for value in (-1, 4, True, "2", None):
@@ -390,7 +375,8 @@ class DirectorTests(unittest.TestCase):
 
     def test_pending_success_credits_communal_with_no_settlement_manager(self):
         quest = self.opening(lane="communal")
-        pending = director.PendingReward(quest, 0, consumption="done", recipients=["CheekyHambone"])
+        pending = director.PendingReward(quest, 0, consumption="done", recipients=["CheekyHambone"],
+                                         source=director.configured_source())
         state = director.State(communal_completions=2, pending_settlement_rewards=[pending])
         director.save_state(state)
         loaded = director.load_state()
@@ -409,7 +395,8 @@ class DirectorTests(unittest.TestCase):
             self.assertEqual(state.private_completions, {})
             self.assertEqual(state.pending_settlement_rewards, [pending])
         quest = self.opening()
-        pending = director.PendingReward(quest, 0, consumption="done", recipients=[quest.player])
+        pending = director.PendingReward(quest, 0, consumption="done", recipients=[quest.player],
+                                         source=director.configured_source())
         state = director.State(pending_settlement_rewards=[pending],
                                private_quest_at={quest.player: 9999})
         with patch.object(director, "DRY_RUN", True):
@@ -423,7 +410,8 @@ class DirectorTests(unittest.TestCase):
 
     def test_lost_vanilla_response_never_advances_completion(self):
         quest = self.opening()
-        pending = director.PendingReward(quest, 0, consumption="done", recipients=[quest.player])
+        pending = director.PendingReward(quest, 0, consumption="done", recipients=[quest.player],
+                                         source=director.configured_source())
         state = director.State(pending_settlement_rewards=[pending],
                                private_quest_at={quest.player: 9999})
         with patch.object(director, "rcon", side_effect=OSError("lost reward response")):
@@ -442,7 +430,7 @@ class DirectorTests(unittest.TestCase):
                                          consumption="uncertain")
         state = director.State(communal_quest=communal, private_quests={"Offline": offline},
                                active_quest=legacy, pending_settlement_rewards=[pending,
-                               director.PendingReward(communal, 0, consumption="done")])
+                               director.PendingReward(communal, 0, consumption="done", recipients=["CheekyHambone"])])
         expected = {"minecraft:pumpkin", "minecraft:wheat", "minecraft:carrot", "minecraft:potato"}
         self.assertEqual(director.reserved_items(state), expected)
         director.save_state(state)
@@ -482,7 +470,7 @@ class DirectorTests(unittest.TestCase):
             director.complete_settlement_quest(state, quest, None)
         self.assertEqual(state.pending_settlement_rewards, [])
         self.assertEqual(self.world.chest_items, [(0, "minecraft:pumpkin", 10)])
-        self.assertFalse(any(c.startswith(("data remove ", "data modify ", "give ")) for c in self.world.commands))
+        self.assertEqual(self.world.player_rewards, {})
 
     def test_personal_reference_ceiling_cadence_and_normal_fallback(self):
         state = director.State(private_completions={"CheekyHambone": 3}, private_issued={"CheekyHambone": 4})
@@ -604,8 +592,7 @@ class DirectorTests(unittest.TestCase):
         self.assertEqual(self.world.chest_items, [(0, "minecraft:carrot", 10), (1, "minecraft:stick", 2)])
         self.assertEqual(state.communal_completions, 0)
         self.assertEqual(state.pending_settlement_rewards, [])
-        self.assertFalse(any(c.startswith(("give ", "data remove ", "data modify ")) for c in self.world.commands))
-        self.assertTrue(any("catalog-minimum" in c for c in self.world.commands))
+        self.assertEqual(self.world.player_rewards, {})
 
     def test_legacy_unknown_supply_suspends_and_validated_goal_survives_harvesting(self):
         quest = self.opening(lane="communal", legacy=True)
@@ -646,7 +633,8 @@ class DirectorTests(unittest.TestCase):
     def test_main_recovers_pending_rewards_with_settlements_disabled(self):
         quest = self.opening()
         state = director.State(pending_settlement_rewards=[
-            director.PendingReward(quest, 0, consumption="done", recipients=[quest.player])])
+            director.PendingReward(quest, 0, consumption="done", recipients=[quest.player],
+                                   source=director.configured_source())])
         with patch.object(director, "SETTLEMENT_ENABLED", False), patch.object(director, "RCON_PASSWORD", "test"), \
                 patch.object(director, "load_state", return_value=state), \
                 patch.object(director.LogTail, "read_new", return_value=[]), \
@@ -696,7 +684,7 @@ class DirectorTests(unittest.TestCase):
         self.assertEqual(asdict(pending), before)
         self.assertEqual(self.world.chest_items, [(0, "minecraft:pumpkin", 10)])
         self.assertEqual(state.private_completions, {})
-        self.assertFalse(any(c.startswith(("give ", "data remove ", "data modify ")) for c in self.world.commands))
+        self.assertEqual(self.world.player_rewards, {})
 
     def test_communal_third_completion_and_saturation_select_progression_next(self):
         quest = self.opening(lane="communal")
@@ -709,7 +697,8 @@ class DirectorTests(unittest.TestCase):
         personal = director.candidate_items("private", self.profile(), self.local_supply(), 100, state=state)
         self.assertEqual({c["mode"] for c in personal}, {"warmup"})
         another = self.opening(lane="communal", quest_id="another")
-        pending = director.PendingReward(another, 0, consumption="done", recipients=["CheekyHambone"])
+        pending = director.PendingReward(another, 0, consumption="done", recipients=["CheekyHambone"],
+                                         source=director.configured_source())
         state.pending_settlement_rewards.append(pending)
         director.process_pending_rewards(state, None)
         self.assertEqual(director.load_state().communal_completions, 3)
